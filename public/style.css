@@ -1,0 +1,1345 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+    padding: 20px 0;
+    margin-bottom: 40px;
+}
+
+header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+h1 {
+    font-size: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+}
+
+.search-hint {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+    padding-left: 4px;
+    line-height: 1.3;
+}
+
+.search-hint code {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    color: #667eea;
+    font-size: 11px;
+}
+
+.hot-tags {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    flex-wrap: wrap;
+}
+
+.hot-tags-label {
+    font-weight: 600;
+    color: #667eea;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.hot-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1;
+}
+
+.hot-tag-btn {
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    font-size: 12px;
+    color: #667eea;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.hot-tag-btn .tag-count {
+    font-size: 10px;
+    color: #999;
+    font-weight: 600;
+}
+
+.hot-tag-btn:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.hot-tag-btn:hover .tag-count {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.current-user-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.user-role {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.user-name {
+    color: #333;
+}
+
+.btn-logout {
+    padding: 4px 12px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 8px;
+}
+
+.btn-logout:hover {
+    background: #d32f2f;
+}
+
+.tag-filter {
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s;
+    outline: none;
+}
+
+.tag-filter:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea {
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s;
+    outline: none;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+#searchInput {
+    width: 100%;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-secondary:hover {
+    background: #667eea;
+    color: white;
+}
+
+.game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.game-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.game-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.game-thumbnail {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    flex-shrink: 0;
+}
+
+.game-info {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.game-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+    min-height: 46px; /* 2行的高度 */
+}
+
+.game-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    min-height: 28px; /* 至少一行 tag 的高度 */
+    align-content: flex-start;
+}
+
+.tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    height: 22px;
+    line-height: 14px;
+}
+
+.tag:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.current-tags {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    min-height: 40px;
+}
+
+.current-tags .tag {
+    background: #667eea;
+    margin: 4px;
+}
+
+.game-description {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.5;
+    min-height: 42px; /* 2行的高度 */
+    flex-shrink: 0;
+}
+
+.game-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #999;
+    margin-top: auto; /* 推到底部 */
+    padding-top: 8px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: white;
+    font-size: 18px;
+}
+
+/* 模态框 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 32px;
+    border-radius: 16px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.close {
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #333;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+form input[type="text"],
+form input[type="password"],
+form textarea,
+form .form-row {
+    width: 100%;
+    margin: 0;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+}
+
+.form-row input[type="text"] {
+    width: 100%;
+}
+
+.file-list {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #666;
+}
+
+/* 上传模式切换标签 */
+.upload-mode-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-tab-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ddd;
+    background: white;
+    color: #333;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.mode-tab-btn:hover {
+    border-color: #667eea;
+    background: #f0f7ff;
+}
+
+.mode-tab-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* 上传方式切换标签 */
+.upload-method-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.tab-btn:hover {
+    border-color: #667eea;
+}
+
+.tab-btn.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.upload-method {
+    margin-bottom: 16px;
+}
+
+/* 快速上传提示框 */
+.quick-upload-hint {
+    background: #f0f7ff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #667eea;
+}
+
+.quick-upload-hint p {
+    margin: 0;
+    color: #1e40af;
+    font-size: 14px;
+}
+
+/* 快速上传游戏信息 */
+.quick-game-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.quick-game-info .info-label {
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    color: #666;
+}
+
+.quick-game-info .info-value {
+    margin: 0;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+}
+
+textarea {
+    min-height: 100px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.file-label {
+    display: block;
+    padding: 12px 16px;
+    background: #f5f5f5;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.file-label:hover {
+    background: #ebebeb;
+    border-color: #667eea;
+}
+
+.file-label input[type="file"] {
+    display: none;
+}
+
+/* 管理员面板 */
+.admin-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    /* 头部优化 */
+    header {
+        padding: 12px 0;
+        margin-bottom: 20px;
+    }
+
+    header .container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+        text-align: center;
+    }
+
+    .header-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .search-container {
+        width: 100%;
+        max-width: none;
+    }
+
+    #searchInput {
+        width: 100%;
+    }
+
+    .search-hint {
+        font-size: 10px;
+    }
+
+    .hot-tags {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px;
+        margin-bottom: 16px;
+    }
+
+    .hot-tags-label {
+        font-size: 13px;
+    }
+
+    .hot-tags-list {
+        gap: 6px;
+    }
+
+    .hot-tag-btn {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    .current-user-display {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    .btn-logout {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* 游戏网格优化 */
+    .game-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    /* 游戏卡片优化 */
+    .game-card {
+        border-radius: 8px;
+    }
+
+    .game-thumbnail {
+        height: 120px;
+    }
+
+    .game-info {
+        padding: 12px;
+    }
+
+    .game-title {
+        font-size: 14px;
+        min-height: 36px;
+        margin-bottom: 6px;
+    }
+
+    .game-tags {
+        gap: 4px;
+        margin-bottom: 6px;
+        min-height: 22px;
+    }
+
+    .tag {
+        font-size: 10px;
+        padding: 3px 8px;
+        height: 20px;
+        line-height: 14px;
+    }
+
+    .game-description {
+        font-size: 12px;
+        min-height: 36px;
+        margin-bottom: 8px;
+        -webkit-line-clamp: 2;
+    }
+
+    .game-meta {
+        font-size: 11px;
+        flex-direction: column;
+        gap: 4px;
+        padding-top: 6px;
+    }
+
+    /* 按钮优化 */
+    .game-info button {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+
+    /* 模态框优化 */
+    .modal-content {
+        padding: 20px;
+        width: 95%;
+        max-height: 85vh;
+        border-radius: 12px;
+    }
+
+    .modal-content h2 {
+        font-size: 1.3rem;
+        margin-bottom: 16px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    textarea,
+    .tag-filter {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+
+    textarea {
+        min-height: 80px;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+
+    .upload-method-tabs {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .tab-btn {
+        padding: 12px;
+    }
+
+    .file-label {
+        padding: 12px;
+        font-size: 13px;
+    }
+
+    /* 管理员菜单优化 */
+    .admin-menu {
+        padding: 70px 10px 10px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .admin-menu-content {
+        width: 90%;
+        max-width: 300px;
+    }
+
+    .admin-menu-content button {
+        padding: 14px 16px;
+        font-size: 14px;
+    }
+
+    /* 管理员表格优化 */
+    .admin-table {
+        font-size: 12px;
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .admin-table th,
+    .admin-table td {
+        padding: 8px;
+        font-size: 11px;
+    }
+
+    /* 容器优化 */
+    .container {
+        padding: 0 12px;
+    }
+
+    .empty-state {
+        padding: 40px 20px;
+        font-size: 16px;
+    }
+}
+
+/* 游戏详情页移动端优化 */
+@media (max-width: 768px) {
+    .game-detail {
+        padding: 20px 16px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+    }
+
+    .game-header {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .game-detail-thumbnail {
+        width: 100%;
+        height: auto;
+        max-height: 250px;
+        object-fit: cover;
+    }
+
+    .game-header-info h1 {
+        font-size: 1.5rem;
+        margin-bottom: 12px;
+        /* 强制换行 - 覆盖渐变样式 */
+        word-wrap: break-word;
+        word-break: break-all; /* 改为 break-all 强制断开 */
+        overflow-wrap: anywhere; /* 更强的换行 */
+        hyphens: auto;
+        /* 移除渐变效果以确保换行正常 */
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: unset !important;
+        background-clip: unset !important;
+        /* 使用纯色渐变色 */
+        color: #667eea;
+        /* 确保容器不溢出 */
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .game-header-info .game-description {
+        font-size: 14px;
+        line-height: 1.5;
+        margin: 12px 0;
+        word-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .game-header-info .game-meta {
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+    }
+
+    .game-header-info > div[style*="display: flex"] {
+        flex-direction: column !important;
+        gap: 8px !important;
+        margin-top: 16px !important;
+    }
+
+    .game-header-info button {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 14px;
+        white-space: normal;
+        word-wrap: break-word;
+        word-break: break-all; /* 强制断开长单词 */
+        overflow-wrap: anywhere;
+    }
+
+    /* 评论区优化 */
+    .comments-section {
+        padding: 20px 16px;
+        border-radius: 8px;
+    }
+
+    .comments-section h2 {
+        font-size: 1.3rem;
+        margin-bottom: 16px;
+    }
+
+    .comment-form {
+        margin-bottom: 20px;
+    }
+
+    .reply-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    .btn-cancel-reply {
+        width: 100%;
+    }
+
+    .comment-form textarea {
+        min-height: 80px;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+
+    .comment-form button {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 14px;
+    }
+
+    .comments-list {
+        gap: 12px;
+    }
+
+    .comment {
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .comment-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .comment-username {
+        font-size: 14px;
+    }
+
+    .comment-date {
+        font-size: 11px;
+    }
+
+    .btn-like-comment {
+        margin-left: 0;
+        order: 3;
+    }
+
+    .btn-reply-comment {
+        order: 4;
+    }
+
+    .btn-delete-comment {
+        order: 5;
+        width: 100%;
+        padding: 6px 12px;
+    }
+
+    .comment-quote {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .comment-content {
+        font-size: 14px;
+        line-height: 1.5;
+        word-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .no-comments {
+        padding: 30px 0;
+        font-size: 13px;
+    }
+}
+
+/* 小屏手机优化 (< 480px) */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.3rem;
+    }
+
+    .game-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+    }
+
+    .game-thumbnail {
+        height: 100px;
+    }
+
+    .game-info {
+        padding: 10px;
+    }
+
+    .game-title {
+        font-size: 13px;
+        min-height: 34px;
+    }
+
+    .game-description {
+        font-size: 11px;
+        min-height: 33px;
+    }
+
+    .modal-content {
+        padding: 16px;
+    }
+
+    .modal-content h2 {
+        font-size: 1.2rem;
+    }
+}
+
+/* 游戏详情页 */
+.game-detail {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.game-header {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+}
+
+.game-detail-thumbnail {
+    width: 300px;
+    height: 225px;
+    object-fit: cover;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.game-header-info {
+    flex: 1;
+}
+
+.game-header-info h1 {
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.game-description {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.6;
+    margin: 16px 0;
+}
+
+/* 评论区 */
+.comments-section {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.comments-section h2 {
+    margin-bottom: 24px;
+    color: #333;
+}
+
+.comment-form {
+    margin-bottom: 32px;
+}
+
+.reply-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #1976d2;
+}
+
+.btn-cancel-reply {
+    padding: 4px 12px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-reply:hover {
+    background: #d32f2f;
+}
+
+.comment-form textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.3s;
+    outline: none;
+    margin-bottom: 12px;
+}
+
+.comment-form textarea:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.comment {
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.comment-username {
+    font-weight: 600;
+    color: #667eea;
+}
+
+.comment-date {
+    font-size: 12px;
+    color: #999;
+}
+
+.btn-like-comment {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.btn-like-comment:hover {
+    background: #f5f5f5;
+    border-color: #ff4081;
+}
+
+.btn-like-comment.liked {
+    background: #ffe0ec;
+    border-color: #ff4081;
+    color: #ff4081;
+}
+
+.like-icon {
+    font-size: 14px;
+}
+
+.like-count {
+    font-weight: 600;
+}
+
+.btn-reply-comment {
+    padding: 4px 12px;
+    background: white;
+    color: #667eea;
+    border: 1px solid #667eea;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-reply-comment:hover {
+    background: #667eea;
+    color: white;
+}
+
+.btn-delete-comment {
+    padding: 4px 12px;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-comment:hover {
+    background: #d32f2f;
+}
+
+.comment-quote {
+    padding: 8px 12px;
+    background: #f0f0f0;
+    border-left: 3px solid #999;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #666;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.comment-content {
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.no-comments {
+    text-align: center;
+    color: #999;
+    padding: 40px 0;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .game-header {
+        flex-direction: column;
+    }
+    
+    .game-detail-thumbnail {
+        width: 100%;
+        height: auto;
+    }
+}
+
+/* 管理员菜单 */
+.admin-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    z-index: 2000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 80px 20px 20px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.admin-menu.active {
+    opacity: 1;
+}
+
+.admin-menu-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    min-width: 200px;
+}
+
+.admin-menu-content button {
+    display: block;
+    width: 100%;
+    padding: 16px 20px;
+    border: none;
+    background: white;
+    text-align: left;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.admin-menu-content button:last-child {
+    border-bottom: none;
+}
+
+.admin-menu-content button:hover {
+    background: #f5f5f5;
+}
+
+/* 管理员表格 */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.admin-table th {
+    background: #f5f5f5;
+    font-weight: 600;
+    color: #333;
+}
+
+.admin-table tr:hover {
+    background: #f9f9f9;
+}
+
+.admin-table td {
+    font-size: 14px;
+    color: #666;
+}

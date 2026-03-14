@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash 游戏平台</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/i18n.js"></script>
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1 data-i18n="app.title">🎮 Flash 游戏平台</h1>
+            <div class="header-actions">
+                <div class="search-container">
+                    <input type="text" id="searchInput" data-i18n-placeholder="games.search.placeholder" placeholder="搜索游戏或标签（如：tag:RPG）...">
+                    <div class="search-hint" data-i18n="games.searchHint">💡 支持标签搜索：<code>tag:标签名</code> 或 <code>-tag:标签名</code> 排除</div>
+                </div>
+                <select id="languageSelect" style="padding: 10px; border-radius: 6px; border: 1px solid #ddd; margin-right: 10px; cursor: pointer;">
+                    <option value="zh-CN">中文</option>
+                    <option value="en">English</option>
+                </select>
+                <select id="sortSelect" style="padding: 10px; border-radius: 6px; border: 1px solid #ddd; margin-right: 10px; cursor: pointer;">
+                    <option value="date_desc" data-i18n="games.sort.latest">最新上传</option>
+                    <option value="date_asc" data-i18n="games.sort.earliest">最早上传</option>
+                    <option value="play_desc" data-i18n="games.sort.popular">播放最多</option>
+                    <option value="title_asc" data-i18n="games.sort.name">标题 A-Z</option>
+                </select>
+                <button id="adminBtn" class="btn-secondary" data-i18n="nav.admin">管理员</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="hotTags" class="hot-tags"></div>
+        <div id="gameGrid" class="game-grid"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <p data-i18n="games.emptyState">暂无游戏，管理员可以上传游戏</p>
+        </div>
+    </main>
+
+    <!-- 管理员登录模态框 -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>管理员登录</h2>
+            <input type="text" id="adminUsername" placeholder="输入用户名">
+            <input type="password" id="adminPassword" placeholder="输入密码">
+            <div style="font-size: 12px; color: #999; margin: 8px 0;">
+                提示：超级管理员可以只输入密码（用户名留空）
+            </div>
+            <button id="loginBtn" class="btn-primary">登录</button>
+        </div>
+    </div>
+
+    <!-- 上传游戏模态框 -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 data-i18n="admin.uploadGame">上传游戏</h2>
+            
+            <!-- 上传模式切换 -->
+            <div class="upload-mode-tabs">
+                <button type="button" class="mode-tab-btn active" data-mode="quick">
+                    ⚡ <span data-i18n="upload.quickUpload">快速上传</span>
+                </button>
+                <button type="button" class="mode-tab-btn" data-mode="detailed">
+                    📝 <span data-i18n="upload.detailedUpload">详细上传</span>
+                </button>
+            </div>
+
+            <!-- 快速上传模式 -->
+            <form id="quickUploadForm" style="display: block;">
+                <div class="quick-upload-hint">
+                    <p>💡 <span data-i18n="upload.quickUploadHint">快速上传：游戏名称自动使用文件夹名或文件名，只需选择文件即可</span></p>
+                </div>
+                
+                <div class="upload-method-tabs">
+                    <button type="button" class="tab-btn active" data-method="folder">📁 <span data-i18n="upload.selectFolder">选择文件夹</span></button>
+                    <button type="button" class="tab-btn" data-method="single">📄 <span data-i18n="upload.singleSwf">单个 SWF</span></button>
+                </div>
+                
+                <div id="quickFolderUpload" class="upload-method">
+                    <label class="file-label">
+                        <input type="file" id="quickGameFiles" webkitdirectory directory multiple accept=".swf">
+                        <span>📁 <span data-i18n="upload.selectGameFolder">选择游戏文件夹（只包含 SWF 文件）</span></span>
+                    </label>
+                    <div id="quickFileList" class="file-list"></div>
+                </div>
+                
+                <div id="quickSingleSwfUpload" class="upload-method" style="display: none;">
+                    <label class="file-label">
+                        <input type="file" id="quickSingleSwf" accept=".swf">
+                        <span>📄 <span data-i18n="upload.selectSingleSwf">选择单个 SWF 文件</span></span>
+                    </label>
+                    <div id="quickSingleSwfInfo" class="file-list"></div>
+                </div>
+                
+                <div id="quickGameInfo" class="quick-game-info" style="display: none;">
+                    <p class="info-label" data-i18n="upload.willUpload">将要上传：</p>
+                    <p class="info-value" id="quickGameName"></p>
+                </div>
+                
+                <button type="submit" class="btn-primary" id="quickUploadBtn">⚡ <span data-i18n="upload.quickUpload">快速上传</span></button>
+            </form>
+
+            <!-- 详细上传模式 -->
+            <form id="uploadForm" style="display: none;">
+                <input type="text" id="gameTitle" data-i18n-placeholder="upload.gameTitle.placeholder" placeholder="游戏标题（主标题）" required>
+                <div class="form-row">
+                    <input type="text" id="gameTitle2" data-i18n-placeholder="upload.gameTitle2.placeholder" placeholder="游戏标题2（可选，如：日文名）">
+                    <input type="text" id="gameTitle3" data-i18n-placeholder="upload.gameTitle3.placeholder" placeholder="游戏标题3（可选，如：英文名）">
+                </div>
+                <input type="text" id="gameTitle4" data-i18n-placeholder="upload.gameTitle4.placeholder" placeholder="游戏标题4（可选，如：其他译名）">
+                <textarea id="gameDescription" data-i18n-placeholder="upload.description.placeholder" placeholder="游戏描述（可选）"></textarea>
+                <input type="text" id="gameTags" data-i18n-placeholder="upload.tags.placeholder" placeholder="标签（可选，多个标签用逗号分隔，如：RPG, 冒险, 日系）">
+                <input type="text" id="entryFile" data-i18n-placeholder="upload.entryFile.placeholder" placeholder="主 SWF 文件名（如：game.swf 或 data/main.swf）" required>
+                <div class="upload-method-tabs">
+                    <button type="button" class="tab-btn active" data-method="folder">📁 <span data-i18n="upload.selectFolder">选择文件夹</span></button>
+                    <button type="button" class="tab-btn" data-method="zip">📦 <span data-i18n="upload.uploadZip">上传 ZIP</span></button>
+                    <button type="button" class="tab-btn" data-method="single">📄 <span data-i18n="upload.singleSwf">单个 SWF</span></button>
+                </div>
+                <div id="folderUpload" class="upload-method">
+                    <label class="file-label">
+                        <input type="file" id="gameFiles" webkitdirectory directory multiple accept=".swf">
+                        <span>📁 <span data-i18n="upload.selectGameFolder">选择游戏文件夹（只包含 SWF 文件）</span></span>
+                    </label>
+                    <div id="fileList" class="file-list"></div>
+                </div>
+                <div id="zipUpload" class="upload-method" style="display: none;">
+                    <label class="file-label">
+                        <input type="file" id="gameZip" accept=".zip">
+                        <span>📦 <span data-i18n="upload.selectZipFile">选择 ZIP 压缩包（会自动解压并过滤 SWF 文件）</span></span>
+                    </label>
+                    <div id="zipInfo" class="file-list"></div>
+                </div>
+                <div id="singleSwfUpload" class="upload-method" style="display: none;">
+                    <label class="file-label">
+                        <input type="file" id="singleSwf" accept=".swf">
+                        <span>📄 <span data-i18n="upload.selectSingleSwf">选择单个 SWF 文件</span></span>
+                    </label>
+                    <div id="singleSwfInfo" class="file-list"></div>
+                </div>
+                <label class="file-label">
+                    <input type="file" id="thumbnailFile" accept="image/*">
+                    <span>🖼️ <span data-i18n="upload.selectThumbnail">选择缩略图（可选）</span></span>
+                </label>
+                <label class="file-label">
+                    <input type="file" id="saveFile" accept=".sol">
+                    <span>💾 <span data-i18n="upload.selectSaveFile">选择存档文件（可选，.sol 格式，用于全 CG）</span></span>
+                </label>
+                <div id="saveFileInfo" class="file-list"></div>
+                <input type="text" id="saveName" data-i18n-placeholder="upload.saveName.placeholder" placeholder="存档名称（可选，如：mu09、data01 等，留空则不使用存档）">
+                <button type="submit" class="btn-primary" data-i18n="admin.uploadGame">上传游戏</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑游戏模态框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 data-i18n="edit.title">编辑游戏</h2>
+            <form id="editForm">
+                <input type="hidden" id="editGameId">
+                <input type="text" id="editGameTitle" data-i18n-placeholder="upload.gameTitle.placeholder" placeholder="游戏标题（主标题）" required>
+                <input type="text" id="editGameTitle2" data-i18n-placeholder="upload.gameTitle2.placeholder" placeholder="游戏标题2（可选，如：日文名）">
+                <input type="text" id="editGameTitle3" data-i18n-placeholder="upload.gameTitle3.placeholder" placeholder="游戏标题3（可选，如：英文名）">
+                <input type="text" id="editGameTitle4" data-i18n-placeholder="upload.gameTitle4.placeholder" placeholder="游戏标题4（可选，如：其他译名）">
+                <textarea id="editGameDescription" data-i18n-placeholder="upload.description.placeholder" placeholder="游戏描述（可选）"></textarea>
+                <input type="text" id="editGameTags" data-i18n-placeholder="upload.tags.placeholder" placeholder="标签（可选，多个标签用逗号分隔）">
+                <div id="currentTags" class="current-tags"></div>
+                <input type="text" id="editEntryFile" data-i18n-placeholder="upload.entryFile.placeholder" placeholder="主 SWF 文件名（如：game.swf）">
+                <div class="upload-method-tabs">
+                    <button type="button" class="tab-btn active" data-method="folder">📁 <span data-i18n="edit.folder">文件夹</span></button>
+                    <button type="button" class="tab-btn" data-method="zip">📦 <span data-i18n="edit.zip">ZIP</span></button>
+                    <button type="button" class="tab-btn" data-method="single">📄 <span data-i18n="edit.singleSwf">单个 SWF</span></button>
+                </div>
+                <div id="editFolderUpload" class="upload-method">
+                    <label class="file-label">
+                        <input type="file" id="editGameFiles" webkitdirectory directory multiple accept=".swf">
+                        <span>📁 <span data-i18n="edit.replaceFolder">替换游戏文件夹（可选，只包含 SWF 文件）</span></span>
+                    </label>
+                    <div id="editFileList" class="file-list"></div>
+                </div>
+                <div id="editZipUpload" class="upload-method" style="display: none;">
+                    <label class="file-label">
+                        <input type="file" id="editGameZip" accept=".zip">
+                        <span>📦 <span data-i18n="edit.replaceZip">替换 ZIP 压缩包（可选，会自动解压并过滤 SWF 文件）</span></span>
+                    </label>
+                    <div id="editZipInfo" class="file-list"></div>
+                </div>
+                <div id="editSingleSwfUpload" class="upload-method" style="display: none;">
+                    <label class="file-label">
+                        <input type="file" id="editSingleSwf" accept=".swf">
+                        <span>📄 <span data-i18n="edit.replaceSingleSwf">替换单个 SWF 文件（可选，不选则保持原文件）</span></span>
+                    </label>
+                    <div id="editSingleSwfInfo" class="file-list"></div>
+                </div>
+                <label class="file-label">
+                    <input type="file" id="editThumbnailFile" accept="image/*">
+                    <span>🖼️ <span data-i18n="edit.replaceThumbnail">替换缩略图（可选，不选则保持原图）</span></span>
+                </label>
+                <label class="file-label">
+                    <input type="file" id="editSaveFile" accept=".sol">
+                    <span>💾 <span data-i18n="edit.replaceSaveFile">替换存档文件（可选，.sol 格式）</span></span>
+                </label>
+                <div id="editSaveFileInfo" class="file-list"></div>
+                <input type="text" id="editSaveName" data-i18n-placeholder="upload.saveName.placeholder" placeholder="存档名称（可选，如：mu09、data01 等，留空则不使用存档）">
+                <button type="submit" class="btn-primary" data-i18n="edit.saveChanges">保存修改</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/app.js?v=15"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "flash-game-platform",
+  "version": "1.0.0",
+  "description": "Flash游戏在线播放平台",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute flash_games_db --file=./init.sql --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
+}

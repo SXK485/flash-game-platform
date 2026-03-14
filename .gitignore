@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+dist/
+*.log
+.DS_Store
+.vscode/
+
+# 配置文件（包含敏感信息）
+wrangler.toml
