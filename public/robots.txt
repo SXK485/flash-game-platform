@@ -1,0 +1,17 @@
+# robots.txt for Flash Game Platform
+User-agent: *
+Allow: /
+Allow: /game.html
+Allow: /play.html
+
+# 禁止爬取管理员页面
+Disallow: /analytics.html
+
+# 禁止爬取 API 端点
+Disallow: /api/
+
+# 禁止爬取文件存储
+Disallow: /files/
+
+# Sitemap
+Sitemap: https://flash.flowerspine.xyz/sitemap.xml
