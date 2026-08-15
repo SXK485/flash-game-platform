@@ -47,8 +47,10 @@
         }
 
         .stat-card .change {
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 8px;
+            line-height: 1.5;
+            white-space: pre-line;
         }
 
         .change.positive {
@@ -520,34 +522,40 @@
 
                 if (response.ok) {
                     const stats = await response.json();
-                    document.getElementById('totalViews').textContent = stats.totalViews.toLocaleString();
-                    document.getElementById('totalPlays').textContent = stats.totalPlays.toLocaleString();
-                    document.getElementById('totalDownloads').textContent = stats.totalDownloads.toLocaleString();
+                    document.getElementById('totalViews').textContent = stats.todayViews.toLocaleString();
+                    document.getElementById('totalPlays').textContent = stats.todayPlays.toLocaleString();
+                    document.getElementById('totalDownloads').textContent = stats.todayDownloads.toLocaleString();
                     document.getElementById('todayActive').textContent = stats.todayActive.toLocaleString();
 
-                    // 显示变化
-                    updateChange('viewsChange', stats.viewsChange);
-                    updateChange('playsChange', stats.playsChange);
-                    updateChange('downloadsChange', stats.downloadsChange);
-                    updateChange('activeChange', stats.activeChange);
+                    // 大数字显示“今日”，下面显示“累计 / 昨日 / 较昨日”
+                    updateStatDetail('viewsChange', stats.todayViews, stats.yesterdayViews, stats.totalViews);
+                    updateStatDetail('playsChange', stats.todayPlays, stats.yesterdayPlays, stats.totalPlays);
+                    updateStatDetail('downloadsChange', stats.todayDownloads, stats.yesterdayDownloads, stats.totalDownloads);
+                    updateStatDetail('activeChange', stats.todayActive, stats.yesterdayActive, stats.totalViews + stats.totalPlays + stats.totalDownloads);
                 }
             } catch (error) {
                 console.error('加载统计失败:', error);
             }
         }
 
-        function updateChange(elementId, change) {
+        function updateStatDetail(elementId, today, yesterday, total) {
             const element = document.getElementById(elementId);
-            if (change > 0) {
-                element.textContent = `↑ ${change}% ${i18n.t('analytics.compared')}`;
-                element.className = 'change positive';
-            } else if (change < 0) {
-                element.textContent = `↓ ${Math.abs(change)}% ${i18n.t('analytics.compared')}`;
-                element.className = 'change negative';
+            const diff = today - yesterday;
+            const totalLine = `${i18n.t('analytics.totalLabel')} ${total.toLocaleString()}`;
+
+            let compareLine;
+            if (yesterday > 0) {
+                const percent = Math.round((diff / yesterday) * 100);
+                const sign = diff >= 0 ? '+' : '';
+                compareLine = `${i18n.t('analytics.yesterday')} ${yesterday.toLocaleString()} · ${i18n.t('analytics.compared')} ${sign}${diff.toLocaleString()} (${sign}${percent}%)`;
+            } else if (today > 0) {
+                compareLine = `${i18n.t('analytics.yesterday')} 0 · ${i18n.t('analytics.todayNew')} +${today.toLocaleString()}`;
             } else {
-                element.textContent = `- ${i18n.t('analytics.compared')}`;
-                element.className = 'change';
+                compareLine = `${i18n.t('analytics.yesterday')} 0`;
             }
+
+            element.textContent = `${totalLine}\n${compareLine}`;
+            element.className = diff > 0 ? 'change positive' : diff < 0 ? 'change negative' : 'change';
         }
 
         // 加载游戏统计

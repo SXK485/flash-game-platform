@@ -601,7 +601,7 @@ async function handleAPI(request, env, path, corsHeaders) {
       ).bind(gameId, action, userIP, userAgent, country).run();
 
       // 更新每日统计
-      const today = new Date().toISOString().split('T')[0];
+      const today = getShanghaiDateString();
       const column = action === 'view' ? 'view_count' : action === 'play' ? 'play_count' : 'download_count';
       
       await env.DB.prepare(`
@@ -624,8 +624,8 @@ async function handleAPI(request, env, path, corsHeaders) {
     }
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const today = getShanghaiDateString();
+      const yesterday = getShanghaiDateString(new Date(Date.now() - 86400000));
 
       // 今日统计
       const todayStats = await env.DB.prepare(`
@@ -654,26 +654,21 @@ async function handleAPI(request, env, path, corsHeaders) {
         FROM game_stats
       `).first();
 
-      // 计算变化百分比
-      const viewsChange = yesterdayStats.views > 0 
-        ? Math.round(((todayStats.views - yesterdayStats.views) / yesterdayStats.views) * 100)
-        : 0;
-      const playsChange = yesterdayStats.plays > 0
-        ? Math.round(((todayStats.plays - yesterdayStats.plays) / yesterdayStats.plays) * 100)
-        : 0;
-      const downloadsChange = yesterdayStats.downloads > 0
-        ? Math.round(((todayStats.downloads - yesterdayStats.downloads) / yesterdayStats.downloads) * 100)
-        : 0;
+      const todayActive = todayStats.views + todayStats.plays + todayStats.downloads;
+      const yesterdayActive = yesterdayStats.views + yesterdayStats.plays + yesterdayStats.downloads;
 
       return jsonResponse({
         totalViews: totalStats.views,
         totalPlays: totalStats.plays,
         totalDownloads: totalStats.downloads,
-        todayActive: todayStats.views + todayStats.plays + todayStats.downloads,
-        viewsChange,
-        playsChange,
-        downloadsChange,
-        activeChange: 0
+        todayViews: todayStats.views,
+        todayPlays: todayStats.plays,
+        todayDownloads: todayStats.downloads,
+        yesterdayViews: yesterdayStats.views,
+        yesterdayPlays: yesterdayStats.plays,
+        yesterdayDownloads: yesterdayStats.downloads,
+        todayActive,
+        yesterdayActive
       }, 200, corsHeaders);
     } catch (error) {
       console.error('获取总体统计失败:', error);
@@ -694,13 +689,13 @@ async function handleAPI(request, env, path, corsHeaders) {
 
       let dateCondition = '';
       if (timeRange === 'today') {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getShanghaiDateString();
         dateCondition = `WHERE gs.date = '${today}'`;
       } else if (timeRange === '7days') {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+        const sevenDaysAgo = getShanghaiDateString(new Date(Date.now() - 7 * 86400000));
         dateCondition = `WHERE gs.date >= '${sevenDaysAgo}'`;
       } else if (timeRange === '30days') {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+        const thirtyDaysAgo = getShanghaiDateString(new Date(Date.now() - 30 * 86400000));
         dateCondition = `WHERE gs.date >= '${thirtyDaysAgo}'`;
       }
 
@@ -1996,6 +1991,19 @@ function timingSafeEqual(a, b) {
 async function checkSuperAdmin(request, env) {
   const auth = await checkAuth(request, env);
   return auth && auth.role === 'super_admin';
+}
+
+// 按北京时间（Asia/Shanghai）返回 YYYY-MM-DD，避免统计“今天/昨天”跟着 UTC 走
+function getShanghaiDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const get = (type) => parts.find(part => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 function isValidDeviceId(deviceId) {
