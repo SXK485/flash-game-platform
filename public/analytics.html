@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="analytics.title">监控面板</title>
     <link rel="stylesheet" href="/style.css">
-    <script src="/i18n.js"></script>
+    <script src="/i18n.js?v=16"></script>
     <style>
         .analytics-container {
             max-width: 1400px;
@@ -196,7 +196,7 @@
 <body>
     <header>
         <div class="container">
-            <h1 data-i18n="analytics.title">📊 监控面板</h1>
+            <h1 data-i18n="analytics.title" onclick="window.location.href='/'" style="cursor: pointer;" title="返回首页">📊 监控面板</h1>
             <div class="header-actions">
                 <select id="languageSelect" style="padding: 10px; border-radius: 6px; border: 1px solid #ddd; margin-right: 10px; cursor: pointer;">
                     <option value="zh-CN">中文</option>

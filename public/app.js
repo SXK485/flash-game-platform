@@ -98,6 +98,15 @@ function updateFavoriteButtons(gameId, isFavorite) {
     });
 }
 
+// 更新“我的收藏”筛选按钮的图标和文案
+function updateFavoritesFilterButton() {
+    if (!favoritesFilterBtn) {
+        return;
+    }
+    const label = i18n.t('games.filter.favorites');
+    favoritesFilterBtn.innerHTML = `${showFavoritesOnly ? '❤️' : '🤍'} <span>${escapeHtml(label)}</span>`;
+}
+
 // DOM 元素
 const gameGrid = document.getElementById('gameGrid');
 const emptyState = document.getElementById('emptyState');
@@ -320,6 +329,7 @@ function setupEventListeners() {
         favoritesFilterBtn.addEventListener('click', () => {
             showFavoritesOnly = !showFavoritesOnly;
             favoritesFilterBtn.classList.toggle('active', showFavoritesOnly);
+            updateFavoritesFilterButton();
             performSearch(searchInput.value);
         });
     }
@@ -1266,6 +1276,7 @@ function initLanguage() {
         languageSelect.addEventListener('change', (e) => {
             i18n.setLanguage(e.target.value);
             i18n.translatePage();
+            updateFavoritesFilterButton();
             // 重新渲染热门标签（更新 "🔥 热门标签" 文字）
             renderHotTags();
             // 重新渲染游戏列表（更新动态内容）
@@ -1281,6 +1292,7 @@ function initLanguage() {
     
     // 翻译页面
     i18n.translatePage();
+    updateFavoritesFilterButton();
 }
 
 // 刷新打开的模态框

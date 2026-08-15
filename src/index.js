@@ -61,11 +61,16 @@ async function getStaticAsset(request, env) {
     
     // 设置正确的 Content-Type
     const contentType = getContentType(path);
-    
+    // HTML 不缓存（保证页面结构更新后立即可见）；
+    // JS/CSS 等资源短缓存 5 分钟，避免浏览器长期使用旧版本。
+    const cacheControl = path.endsWith('.html')
+      ? 'no-cache, must-revalidate'
+      : 'public, max-age=300';
+
     return new Response(asset, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': cacheControl,
       },
     });
   } catch (e) {
