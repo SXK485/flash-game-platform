@@ -192,11 +192,10 @@
     <div id="coverCaptureOverlay">
         <div class="cover-capture-panel">
             <h3>设置游戏封面</h3>
-            <video id="coverCaptureVideo" autoplay playsinline muted style="display: none;"></video>
             <canvas id="coverCaptureCanvas" style="display: none;"></canvas>
-            <div class="cover-capture-tip" id="coverCaptureTip">选择要分享的窗口后，点“抓取当前画面”，再拖动框选封面区域</div>
+            <div class="cover-capture-tip" id="coverCaptureTip">已抓取游戏画面，按住并拖动框选封面区域</div>
             <div class="cover-capture-actions">
-                <button type="button" id="coverCaptureFrameBtn" onclick="captureCoverFrame()">抓取当前画面</button>
+                <button type="button" id="coverCaptureFrameBtn" onclick="captureCoverFrame()">重新抓取画面</button>
                 <button type="button" id="coverCaptureUploadBtn" onclick="uploadCroppedCover()" disabled>确认设为封面</button>
                 <button type="button" id="coverCaptureCancelBtn" onclick="closeCoverCapture()">取消</button>
             </div>
@@ -222,8 +221,7 @@
             window.location.href = '/';
         }
 
-        // ==================== 管理员截屏设置封面 ====================
-        let coverStream = null;
+        // ==================== 管理员从 Flash 画布截取封面 ====================
         let coverFrameCanvas = null;
         let coverCropRect = null;
         let coverDragStart = null;
@@ -244,67 +242,102 @@
             }
         }
 
+        function findRuffleCanvas() {
+            return document.querySelector('#player-container canvas');
+        }
+
+        function isCanvasBlank(canvas) {
+            try {
+                const ctx = canvas.getContext('2d');
+                const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                for (let i = 3; i < data.length; i += 16) {
+                    if (data[i] !== 0) {
+                        return false;
+                    }
+                }
+            } catch (error) {
+                // 无法读取像素时按非空白处理，交给后续步骤
+                return false;
+            }
+            return true;
+        }
+
+        // 尝试直接抓取 Ruffle 的 canvas 当前画面
+        async function captureRuffleFrame(sourceCanvas) {
+            const frame = document.createElement('canvas');
+            frame.width = sourceCanvas.width;
+            frame.height = sourceCanvas.height;
+            const ctx = frame.getContext('2d');
+            ctx.drawImage(sourceCanvas, 0, 0);
+
+            if (!isCanvasBlank(frame)) {
+                return frame;
+            }
+
+            // WebGL 画布有时直接 drawImage 会是空白，再用 toDataURL 试一次
+            try {
+                const dataUrl = sourceCanvas.toDataURL('image/png');
+                const img = await new Promise((resolve, reject) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.onerror = reject;
+                    image.src = dataUrl;
+                });
+                frame.width = img.width;
+                frame.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                if (!isCanvasBlank(frame)) {
+                    return frame;
+                }
+            } catch (error) {
+                console.error('toDataURL 截取失败:', error);
+            }
+
+            return null;
+        }
+
+        function showCoverCropPanel(frame) {
+            coverFrameCanvas = frame;
+            const canvas = document.getElementById('coverCaptureCanvas');
+            canvas.width = frame.width;
+            canvas.height = frame.height;
+            document.getElementById('coverCaptureOverlay').style.display = 'flex';
+            canvas.style.display = 'block';
+            document.getElementById('coverCaptureTip').textContent = '在画面上按住并拖动，框选要作为封面的区域';
+            document.getElementById('coverCaptureUploadBtn').disabled = true;
+            coverCropRect = null;
+            redrawCoverCanvas();
+        }
+
         async function startCoverCapture() {
             if (!currentGame) {
                 alert('游戏尚未加载完成');
                 return;
             }
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                alert('当前浏览器不支持屏幕捕获，请使用 Chrome / Edge 桌面版');
+
+            const sourceCanvas = findRuffleCanvas();
+            if (!sourceCanvas) {
+                alert('没有找到 Flash 画布，请等游戏画面出现后再试');
                 return;
             }
 
-            try {
-                coverStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: false
-                });
-
-                const video = document.getElementById('coverCaptureVideo');
-                video.srcObject = coverStream;
-                await video.play();
-
-                document.getElementById('coverCaptureOverlay').style.display = 'flex';
-                video.style.display = 'block';
-                document.getElementById('coverCaptureCanvas').style.display = 'none';
-                document.getElementById('coverCaptureTip').textContent = '找到合适画面后，点“抓取当前画面”，再拖动框选封面区域';
-                document.getElementById('coverCaptureFrameBtn').textContent = '抓取当前画面';
-                document.getElementById('coverCaptureUploadBtn').disabled = true;
-                coverFrameCanvas = null;
-                coverCropRect = null;
-
-                coverStream.getVideoTracks()[0].addEventListener('ended', closeCoverCapture);
-            } catch (error) {
-                console.error('屏幕捕获失败:', error);
-                if (error && error.name !== 'NotAllowedError') {
-                    alert('屏幕捕获失败: ' + error.message);
-                }
-            }
+            await captureCoverFrame();
         }
 
-        function captureCoverFrame() {
-            const video = document.getElementById('coverCaptureVideo');
-            const canvas = document.getElementById('coverCaptureCanvas');
-            if (!video.videoWidth) {
-                alert('还没有画面，请稍后再试');
+        async function captureCoverFrame() {
+            const sourceCanvas = findRuffleCanvas();
+            if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) {
+                alert('没有找到 Flash 画布，请等游戏画面出现后再试');
                 return;
             }
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            const frame = await captureRuffleFrame(sourceCanvas);
+            if (!frame) {
+                alert('无法直接抓取当前 Flash 画面。可能因为当前使用 WebGL 渲染器。\n\n解决方法：在游戏详情页把“渲染器”切换为 Canvas2D，再进入游戏后重新点击“设为封面”。');
+                return;
+            }
 
-            coverFrameCanvas = document.createElement('canvas');
-            coverFrameCanvas.width = video.videoWidth;
-            coverFrameCanvas.height = video.videoHeight;
-            coverFrameCanvas.getContext('2d').drawImage(video, 0, 0);
-
-            video.style.display = 'none';
-            canvas.style.display = 'block';
-            document.getElementById('coverCaptureTip').textContent = '在画面上按住并拖动，框选要作为封面的区域';
-            document.getElementById('coverCaptureFrameBtn').textContent = '重新抓取画面';
-            document.getElementById('coverCaptureUploadBtn').disabled = true;
-            coverCropRect = null;
-            redrawCoverCanvas();
+            showCoverCropPanel(frame);
         }
 
         function redrawCoverCanvas() {
@@ -445,12 +478,7 @@
         }
 
         function closeCoverCapture() {
-            if (coverStream) {
-                coverStream.getTracks().forEach(track => track.stop());
-                coverStream = null;
-            }
             document.getElementById('coverCaptureOverlay').style.display = 'none';
-            document.getElementById('coverCaptureVideo').srcObject = null;
             coverFrameCanvas = null;
             coverCropRect = null;
             coverDragStart = null;
