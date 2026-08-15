@@ -1414,11 +1414,9 @@ textarea {
         min-height: 44px; /* 移动端推荐触控尺寸 */
     }
 
-    /* ---------- 首页头部：吸顶 + 两段式 ---------- */
+    /* ---------- 首页头部：不吸顶，搜索独立一行，控件横向滑动 ---------- */
     header {
-        position: sticky;
-        top: 0;
-        z-index: 200;
+        position: static;
         padding: 0;
         margin-bottom: 0;
         border-radius: 0 0 18px 18px;
@@ -1438,13 +1436,20 @@ textarea {
     .header-actions {
         width: 100%;
         flex-direction: row;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 8px;
         align-items: stretch;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+    }
+
+    .header-actions::-webkit-scrollbar {
+        display: none;
     }
 
     .search-container {
-        flex: 1 1 100%;
+        flex: 0 0 100%;
         order: 1;
         max-width: none;
     }
@@ -1461,12 +1466,14 @@ textarea {
 
     .favorites-filter-btn {
         order: 2;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
+        white-space: nowrap;
     }
 
     .header-select {
         order: 3;
         flex: 0 0 auto;
+        white-space: nowrap;
         padding: 8px 10px;
         border: 1px solid #e0e0e0;
         border-radius: 10px;
@@ -1476,12 +1483,14 @@ textarea {
 
     #sortSelect {
         order: 4;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
+        white-space: nowrap;
     }
 
     #adminBtn {
         order: 5;
-        flex: 1 1 auto;
+        flex: 0 0 auto;
+        white-space: nowrap;
     }
 
     /* ---------- 热门标签：横向滑动 ---------- */
@@ -1614,12 +1623,13 @@ textarea {
         margin-bottom: 16px;
     }
 
-    /* ---------- 详情页：封面置顶 + 底部固定操作条 ---------- */
+    /* ---------- 详情页：顶部不固定，底部单行可滑动操作条 ---------- */
     body.game-page {
-        padding-bottom: calc(84px + env(safe-area-inset-bottom));
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
     }
 
     body.game-page header {
+        position: static;
         margin-bottom: 12px;
     }
 
@@ -1669,10 +1679,12 @@ textarea {
         bottom: calc(8px + env(safe-area-inset-bottom));
         z-index: 300;
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 8px;
         margin: 0;
-        padding: 10px;
+        padding: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
         background: rgba(255, 255, 255, 0.96);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -1681,12 +1693,17 @@ textarea {
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
     }
 
+    .game-actions::-webkit-scrollbar {
+        display: none;
+    }
+
     .game-actions button {
-        flex: 1 1 auto;
+        flex: 0 0 auto;
+        min-width: 72px;
         min-height: 44px;
-        padding: 10px 12px;
+        padding: 10px 14px;
         font-size: 13px;
-        white-space: normal;
+        white-space: nowrap;
     }
 
     .comments-section {

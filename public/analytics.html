@@ -234,15 +234,22 @@
             }
 
             .filters {
-                flex-direction: column;
-                align-items: stretch;
+                flex-direction: row;
+                flex-wrap: wrap;
                 gap: 8px;
             }
 
             .filters select,
             .filters input {
-                width: 100%;
+                flex: 1 1 calc(50% - 8px);
+                min-width: 130px;
+                width: auto;
                 box-sizing: border-box;
+            }
+
+            .filters button {
+                flex: 1 1 calc(50% - 8px);
+                min-height: 44px;
             }
 
             .game-stats-table,
@@ -256,11 +263,15 @@
 
             .header-actions {
                 width: 100%;
+                flex-wrap: wrap;
+                gap: 8px;
             }
 
             .header-actions select,
             .header-actions button {
-                width: 100%;
+                flex: 1 1 auto;
+                min-width: 80px;
+                width: auto;
                 margin-right: 0 !important;
                 box-sizing: border-box;
             }
