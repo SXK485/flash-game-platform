@@ -298,11 +298,11 @@ function setupEventListeners() {
             
             // 切换表单显示
             if (mode === 'quick') {
-                document.getElementById('quickUploadForm').style.display = 'block';
+                document.getElementById('quickUploadForm').style.display = 'flex';
                 document.getElementById('uploadForm').style.display = 'none';
             } else {
                 document.getElementById('quickUploadForm').style.display = 'none';
-                document.getElementById('uploadForm').style.display = 'block';
+                document.getElementById('uploadForm').style.display = 'flex';
             }
         });
     });
@@ -1381,7 +1381,7 @@ function showUploadModal() {
     
     // 显示快速上传，隐藏详细上传
     if (quickUploadForm) {
-        quickUploadForm.style.display = 'block';
+        quickUploadForm.style.display = 'flex';
     }
     uploadForm.style.display = 'none';
     
