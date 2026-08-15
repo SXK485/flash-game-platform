@@ -162,7 +162,7 @@
             `).join('');
 
             info.textContent = count > 0
-                ? `★ ${Number(avg).toFixed(1)} (${count})`
+                ? (isAdmin ? `★ ${Number(avg).toFixed(1)} (${count})` : `★ ${Number(avg).toFixed(1)}`)
                 : i18n.t('rating.noRating');
 
             hint.style.display = currentCanRate ? 'none' : 'block';
