@@ -220,6 +220,68 @@ async function handleAPI(request, env, path, corsHeaders) {
     return jsonResponse({ extensions }, 200, corsHeaders);
   }
 
+  // 获取游客收藏列表（匿名设备 ID，无需注册登录）
+  if (path === '/api/favorites' && method === 'GET') {
+    const url = new URL(request.url);
+    const deviceId = (url.searchParams.get('deviceId') || '').trim();
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    const { results } = await env.DB.prepare(
+      'SELECT game_id FROM favorites WHERE device_id = ? ORDER BY created_date DESC'
+    ).bind(deviceId).all();
+
+    return jsonResponse(results.map(row => row.game_id), 200, corsHeaders);
+  }
+
+  // 切换收藏状态（匿名设备 ID，无需注册登录）
+  if (path === '/api/favorites' && method === 'POST') {
+    const body = await request.json();
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const gameId = parseInt(body.gameId, 10);
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+    }
+
+    const game = await env.DB.prepare('SELECT id FROM games WHERE id = ?').bind(gameId).first();
+    if (!game) {
+      return jsonResponse({ error: '游戏不存在' }, 404, corsHeaders);
+    }
+
+    const existing = await env.DB.prepare(
+      'SELECT id FROM favorites WHERE device_id = ? AND game_id = ?'
+    ).bind(deviceId, gameId).first();
+
+    let action;
+    if (existing) {
+      await env.DB.prepare(
+        'DELETE FROM favorites WHERE device_id = ? AND game_id = ?'
+      ).bind(deviceId, gameId).run();
+      action = 'removed';
+    } else {
+      await env.DB.prepare(
+        'INSERT INTO favorites (device_id, game_id) VALUES (?, ?)'
+      ).bind(deviceId, gameId).run();
+      action = 'added';
+    }
+
+    const { count } = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM favorites WHERE game_id = ?'
+    ).bind(gameId).first();
+
+    return jsonResponse({
+      action,
+      favoriteCount: count || 0
+    }, 200, corsHeaders);
+  }
+
   // 获取游戏列表
   if (path === '/api/games' && method === 'GET') {
     const url = new URL(request.url);
@@ -1533,6 +1595,9 @@ async function handleAPI(request, env, path, corsHeaders) {
       await env.FLASH_STORAGE.delete(obj.key);
     }
 
+    // 清理收藏关系（D1 可能未开启外键级联，这里显式删除）
+    await env.DB.prepare('DELETE FROM favorites WHERE game_id = ?').bind(id).run();
+
     // 从数据库删除
     await env.DB.prepare('DELETE FROM games WHERE id = ?').bind(id).run();
 
@@ -1875,6 +1940,10 @@ function timingSafeEqual(a, b) {
 async function checkSuperAdmin(request, env) {
   const auth = await checkAuth(request, env);
   return auth && auth.role === 'super_admin';
+}
+
+function isValidDeviceId(deviceId) {
+  return typeof deviceId === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(deviceId);
 }
 
 function formatBytes(bytes) {

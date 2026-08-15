@@ -62,6 +62,64 @@
         let adminToken = localStorage.getItem('adminToken');
         let currentReplyTo = null; // 当前回复的评论 ID
         let currentQuotedText = ''; // 当前引用的文字
+
+        // 获取匿名设备 ID（与首页 app.js 使用同一个 localStorage key）
+        function getVisitorDeviceId() {
+            let deviceId = localStorage.getItem('flashVisitorId');
+            if (!deviceId) {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    deviceId = window.crypto.randomUUID();
+                } else {
+                    deviceId = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+                }
+                localStorage.setItem('flashVisitorId', deviceId);
+            }
+            return deviceId;
+        }
+
+        // 加载当前游戏的收藏状态
+        async function loadFavoriteState(gameId) {
+            try {
+                const response = await fetch(`/api/favorites?deviceId=${encodeURIComponent(getVisitorDeviceId())}`);
+                if (!response.ok) return;
+
+                const ids = await response.json();
+                updateDetailFavoriteButton(gameId, ids.map(id => Number(id)).includes(Number(gameId)));
+            } catch (error) {
+                console.error('加载收藏状态失败:', error);
+            }
+        }
+
+        // 详情页切换收藏
+        async function toggleFavoriteFromDetail(gameId) {
+            const deviceId = getVisitorDeviceId();
+            try {
+                const response = await fetch('/api/favorites', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ deviceId, gameId })
+                });
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
+                const result = await response.json();
+                updateDetailFavoriteButton(gameId, result.action === 'added');
+            } catch (error) {
+                console.error('收藏操作失败:', error);
+                alert(i18n.t('favorites.toggleFailed'));
+            }
+        }
+
+        function updateDetailFavoriteButton(gameId, isFavorite) {
+            const btn = document.getElementById('favoriteGameBtn');
+            if (!btn) return;
+            btn.classList.toggle('active', isFavorite);
+            btn.innerHTML = isFavorite ? '❤️ ' + i18n.t('favorites.added') : '🤍 ' + i18n.t('favorites.add');
+        }
         
         // 检查登录状态
         async function checkLoginStatus() {
@@ -207,6 +265,9 @@
                                 </p>
                             </div>
                             <div style="display: flex; gap: 12px; margin-top: 20px;">
+                                <button id="favoriteGameBtn" class="btn-secondary" onclick="toggleFavoriteFromDetail(${game.id})">
+                                    🤍 ${i18n.t('favorites.add')}
+                                </button>
                                 <button onclick="playGameAndLog(${game.id})" class="btn-primary">
                                     ${i18n.t('game.startGame')}
                                 </button>
@@ -220,6 +281,9 @@
                 `;
 
                 document.getElementById('gameDetail').innerHTML = detailHTML;
+
+                // 加载收藏状态
+                loadFavoriteState(id);
             } catch (error) {
                 console.error('[DEBUG] 加载游戏失败:', error);
                 document.getElementById('loading').textContent = '加载失败，请返回重试';

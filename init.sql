@@ -97,6 +97,21 @@ CREATE INDEX IF NOT EXISTS idx_comment_likes_comment ON comment_likes(comment_id
 CREATE INDEX IF NOT EXISTS idx_comment_likes_user ON comment_likes(user_identifier);
 
 -- ============================================
+-- 4.5 游客收藏（匿名设备 ID，无需注册登录）
+-- ============================================
+CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    game_id INTEGER NOT NULL,
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_id, game_id),
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorites_device ON favorites(device_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_game ON favorites(game_id);
+
+-- ============================================
 -- 5. 监控系统
 -- ============================================
 CREATE TABLE IF NOT EXISTS access_logs (

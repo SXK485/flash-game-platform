@@ -6,12 +6,104 @@ let currentUser = null;
 let uploadMethod = 'folder'; // 'folder', 'zip', or 'single'
 let editMethod = 'folder'; // 'folder', 'zip', or 'single'
 let allTags = []; // 所有可用的 tags
+let favoriteGameIds = new Set(); // 当前设备的收藏游戏 ID
+let showFavoritesOnly = false; // 首页是否只看收藏
+let visitorDeviceId = null;
+
+// 获取匿名设备 ID（游客免登录收藏用，存在 localStorage）
+function getVisitorDeviceId() {
+    if (visitorDeviceId) {
+        return visitorDeviceId;
+    }
+
+    let deviceId = localStorage.getItem('flashVisitorId');
+    if (!deviceId) {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            deviceId = window.crypto.randomUUID();
+        } else {
+            deviceId = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+        }
+        localStorage.setItem('flashVisitorId', deviceId);
+    }
+
+    visitorDeviceId = deviceId;
+    return deviceId;
+}
+
+// 加载当前设备的收藏列表
+async function loadFavorites() {
+    try {
+        const deviceId = getVisitorDeviceId();
+        const response = await fetch(`/api/favorites?deviceId=${encodeURIComponent(deviceId)}`);
+        if (!response.ok) {
+            return;
+        }
+
+        const ids = await response.json();
+        favoriteGameIds = new Set(ids.map(id => Number(id)));
+    } catch (error) {
+        console.error('加载收藏失败:', error);
+    }
+}
+
+// 切换收藏
+async function toggleFavorite(event, gameId) {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    const deviceId = getVisitorDeviceId();
+    const wasFavorite = favoriteGameIds.has(Number(gameId));
+
+    try {
+        const response = await fetch('/api/favorites', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ deviceId, gameId })
+        });
+
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+
+        const result = await response.json();
+        const isFavorite = result.action === 'added';
+
+        if (isFavorite) {
+            favoriteGameIds.add(Number(gameId));
+        } else {
+            favoriteGameIds.delete(Number(gameId));
+        }
+
+        updateFavoriteButtons(gameId, isFavorite);
+
+        // 如果当前处于“只看收藏”模式，移除后需要刷新列表
+        if (showFavoritesOnly && !isFavorite) {
+            performSearch(searchInput.value);
+        }
+    } catch (error) {
+        console.error('收藏操作失败:', error);
+        alert(i18n.t('favorites.toggleFailed'));
+    }
+}
+
+// 更新页面上该游戏所有收藏按钮的状态
+function updateFavoriteButtons(gameId, isFavorite) {
+    document.querySelectorAll(`[data-favorite-btn="${gameId}"]`).forEach(btn => {
+        btn.classList.toggle('active', isFavorite);
+        btn.title = isFavorite ? i18n.t('favorites.remove') : i18n.t('favorites.add');
+        btn.innerHTML = isFavorite ? '❤️' : '🤍';
+    });
+}
 
 // DOM 元素
 const gameGrid = document.getElementById('gameGrid');
 const emptyState = document.getElementById('emptyState');
 const searchInput = document.getElementById('searchInput');
 const hotTags = document.getElementById('hotTags');
+const favoritesFilterBtn = document.getElementById('favoritesFilterBtn');
 const adminBtn = document.getElementById('adminBtn');
 const loginModal = document.getElementById('loginModal');
 const uploadModal = document.getElementById('uploadModal');
@@ -37,9 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTags();
     setupEventListeners();
     
-    // 先检查登录状态，再加载游戏
-    checkAdminStatus().then(() => {
-        console.log('[DEBUG] 初始化：登录状态检查完成，开始加载游戏');
+    // 先检查登录状态，再加载收藏和游戏
+    checkAdminStatus().then(async () => {
+        console.log('[DEBUG] 初始化：登录状态检查完成，开始加载收藏和游戏');
+        await loadFavorites();
         loadGames();
         
         // 检查是否有编辑参数
@@ -62,8 +155,9 @@ window.addEventListener('pageshow', (event) => {
     // 如果不是第一次触发 pageshow，说明是浏览器返回
     if (pageLoadCount > 1) {
         console.log('[DEBUG] 检测到浏览器返回，重新检查登录状态并渲染');
-        checkAdminStatus().then(() => {
+        checkAdminStatus().then(async () => {
             console.log('[DEBUG] 登录状态检查完成，重新渲染游戏列表');
+            await loadFavorites();
             performSearch(searchInput.value);
         });
     }
@@ -78,7 +172,8 @@ document.addEventListener('visibilitychange', () => {
         const lastRender = window.lastRenderTime || 0;
         if (now - lastRender > 1000) { // 超过1秒，可能是从其他页面返回
             console.log('[DEBUG] 可能从其他页面返回，重新渲染');
-            checkAdminStatus().then(() => {
+            checkAdminStatus().then(async () => {
+                await loadFavorites();
                 performSearch(searchInput.value);
             });
         }
@@ -219,6 +314,15 @@ function setupEventListeners() {
     sortSelect.addEventListener('change', () => {
         performSearch(searchInput.value);
     });
+
+    // 我的收藏筛选
+    if (favoritesFilterBtn) {
+        favoritesFilterBtn.addEventListener('click', () => {
+            showFavoritesOnly = !showFavoritesOnly;
+            favoritesFilterBtn.classList.toggle('active', showFavoritesOnly);
+            performSearch(searchInput.value);
+        });
+    }
 
     // 管理员按钮
     adminBtn.addEventListener('click', () => {
@@ -2084,15 +2188,25 @@ async function loadGames(searchParams = {}) {
         const response = await fetch(url);
         let games = await response.json();
 
-        if (games.length === 0) {
-            gameGrid.innerHTML = '';
-            emptyState.style.display = 'block';
-            return;
-        }
-
         // 应用排序
         const sortBy = document.getElementById('sortSelect').value;
         games = sortGames(games, sortBy);
+
+        // “只看收藏”过滤（游客匿名收藏）
+        if (showFavoritesOnly) {
+            games = games.filter(game => favoriteGameIds.has(Number(game.id)));
+        }
+
+        if (games.length === 0) {
+            gameGrid.innerHTML = '';
+            const emptyText = showFavoritesOnly ? i18n.t('favorites.empty') : i18n.t('games.emptyState');
+            const emptyParagraph = emptyState.querySelector('p');
+            if (emptyParagraph) {
+                emptyParagraph.textContent = emptyText;
+            }
+            emptyState.style.display = 'block';
+            return;
+        }
 
         emptyState.style.display = 'none';
         renderGames(games);
@@ -2153,6 +2267,12 @@ function renderGames(games) {
         
         return `
             <div class="game-card" onclick="window.location.href='/game.html?id=${game.id}'">
+                <button class="favorite-btn ${favoriteGameIds.has(Number(game.id)) ? 'active' : ''}"
+                        data-favorite-btn="${game.id}"
+                        onclick="toggleFavorite(event, ${game.id})"
+                        title="${favoriteGameIds.has(Number(game.id)) ? i18n.t('favorites.remove') : i18n.t('favorites.add')}">
+                    ${favoriteGameIds.has(Number(game.id)) ? '❤️' : '🤍'}
+                </button>
                 ${game.thumbnail_url 
                     ? `<img src="${game.thumbnail_url}" alt="${game.title}" class="game-thumbnail">`
                     : '<div class="game-thumbnail"></div>'
