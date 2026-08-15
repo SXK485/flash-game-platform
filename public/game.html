@@ -241,7 +241,7 @@
 
                 const detailHTML = `
                     <div class="game-header">
-                        ${game.thumbnail_url ? `<img src="${game.thumbnail_url}" alt="${game.title}" class="game-detail-thumbnail">` : ''}
+                        ${game.thumbnail_url ? `<img src="${game.thumbnail_url}" alt="${game.title}" class="game-detail-thumbnail">` : `<div class="game-detail-thumbnail auto-cover" style="background:${coverGradient(game.id)}"><span>${escapeHtml(game.title)}</span></div>`}
                         <div class="game-header-info">
                             <h1>${escapeHtml(game.title)}</h1>
                             ${game.tags && game.tags.length > 0 ? `
@@ -520,6 +520,11 @@
                 console.error('删除失败:', error);
                 alert(i18n.t('game.deleteFailed'));
             }
+        }
+
+        function coverGradient(gameId) {
+            const hue = (Number(gameId) * 47) % 360;
+            return `linear-gradient(135deg, hsl(${hue}, 70%, 52%), hsl(${(hue + 45) % 360}, 72%, 34%))`;
         }
 
         function escapeHtml(text) {

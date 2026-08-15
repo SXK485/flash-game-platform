@@ -67,6 +67,12 @@ async function loadPlayHistory() {
     }
 }
 
+// 根据游戏 ID 生成稳定的渐变封面背景
+function coverGradient(gameId) {
+    const hue = (Number(gameId) * 47) % 360;
+    return `linear-gradient(135deg, hsl(${hue}, 70%, 52%), hsl(${(hue + 45) % 360}, 72%, 34%))`;
+}
+
 // 渲染最近游玩区域
 function renderRecentGames() {
     if (!recentGamesSection || !recentGamesList) {
@@ -83,7 +89,7 @@ function renderRecentGames() {
         <div class="recent-game-card" onclick="window.location.href='/play.html?id=${game.id}'">
             ${game.thumbnail_url
                 ? `<img src="${escapeHtml(game.thumbnail_url)}" alt="${escapeHtml(game.title)}">`
-                : '<div class="recent-game-thumbnail-placeholder">🎮</div>'
+                : `<div class="recent-game-thumbnail-placeholder auto-cover" style="background:${coverGradient(game.id)}"><span>${escapeHtml(game.title)}</span></div>`
             }
             <div class="recent-game-title">${escapeHtml(game.title)}</div>
         </div>
@@ -2354,7 +2360,7 @@ function renderGames(games) {
                 </button>
                 ${game.thumbnail_url 
                     ? `<img src="${game.thumbnail_url}" alt="${game.title}" class="game-thumbnail">`
-                    : '<div class="game-thumbnail"></div>'
+                    : `<div class="game-thumbnail auto-cover" style="background:${coverGradient(game.id)}"><span>${escapeHtml(game.title)}</span></div>`
                 }
                 <div class="game-info">
                     <div class="game-title">${escapeHtml(game.title)}</div>

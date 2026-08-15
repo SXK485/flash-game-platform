@@ -53,6 +53,94 @@
             background: white;
             transform: translateY(-2px);
         }
+        #capture-cover-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 16px;
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 10000;
+            display: none;
+        }
+        #coverCaptureOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 20000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.82);
+            padding: 12px;
+        }
+        .cover-capture-panel {
+            width: min(92vw, 860px);
+            background: #16181d;
+            border: 1px solid #2a2d35;
+            border-radius: 14px;
+            padding: 14px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .cover-capture-panel h3 {
+            font-size: 16px;
+            text-align: center;
+        }
+        .cover-capture-panel video,
+        .cover-capture-panel canvas {
+            width: 100%;
+            max-height: 62vh;
+            object-fit: contain;
+            background: #000;
+            border-radius: 8px;
+        }
+        #coverCaptureCanvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+        .cover-capture-tip {
+            text-align: center;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .cover-capture-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        .cover-capture-actions button {
+            min-height: 40px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #coverCaptureFrameBtn {
+            background: #667eea;
+            color: white;
+        }
+        #coverCaptureUploadBtn {
+            background: #10b981;
+            color: white;
+        }
+        #coverCaptureUploadBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        #coverCaptureCancelBtn {
+            background: #333;
+            color: white;
+        }
         /* 移动端优化 */
         @media (max-width: 768px) {
             #back-btn {
@@ -60,6 +148,23 @@
                 font-size: 14px;
                 top: 10px;
                 left: 10px;
+            }
+            #capture-cover-btn {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            .cover-capture-panel {
+                width: 100vw;
+                height: 100vh;
+                max-height: none;
+                border-radius: 0;
+                padding: 12px;
+            }
+            .cover-capture-panel video,
+            .cover-capture-panel canvas {
+                max-height: 60vh;
             }
         }
         #player-container {
@@ -83,6 +188,20 @@
 </head>
 <body>
     <button id="back-btn" onclick="goBack()" data-i18n="app.back">← 返回</button>
+    <button id="capture-cover-btn" onclick="startCoverCapture()">📸 设为封面</button>
+    <div id="coverCaptureOverlay">
+        <div class="cover-capture-panel">
+            <h3>设置游戏封面</h3>
+            <video id="coverCaptureVideo" autoplay playsinline muted style="display: none;"></video>
+            <canvas id="coverCaptureCanvas" style="display: none;"></canvas>
+            <div class="cover-capture-tip" id="coverCaptureTip">选择要分享的窗口后，点“抓取当前画面”，再拖动框选封面区域</div>
+            <div class="cover-capture-actions">
+                <button type="button" id="coverCaptureFrameBtn" onclick="captureCoverFrame()">抓取当前画面</button>
+                <button type="button" id="coverCaptureUploadBtn" onclick="uploadCroppedCover()" disabled>确认设为封面</button>
+                <button type="button" id="coverCaptureCancelBtn" onclick="closeCoverCapture()">取消</button>
+            </div>
+        </div>
+    </div>
     <div id="player-container">
         <div id="loading" data-i18n="app.loading">加载中...</div>
     </div>
@@ -102,6 +221,243 @@
             }
             window.location.href = '/';
         }
+
+        // ==================== 管理员截屏设置封面 ====================
+        let coverStream = null;
+        let coverFrameCanvas = null;
+        let coverCropRect = null;
+        let coverDragStart = null;
+
+        async function checkCoverPermission() {
+            const token = localStorage.getItem('adminToken');
+            if (!token) return;
+
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    document.getElementById('capture-cover-btn').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('检查封面权限失败:', error);
+            }
+        }
+
+        async function startCoverCapture() {
+            if (!currentGame) {
+                alert('游戏尚未加载完成');
+                return;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                alert('当前浏览器不支持屏幕捕获，请使用 Chrome / Edge 桌面版');
+                return;
+            }
+
+            try {
+                coverStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: false
+                });
+
+                const video = document.getElementById('coverCaptureVideo');
+                video.srcObject = coverStream;
+                await video.play();
+
+                document.getElementById('coverCaptureOverlay').style.display = 'flex';
+                video.style.display = 'block';
+                document.getElementById('coverCaptureCanvas').style.display = 'none';
+                document.getElementById('coverCaptureTip').textContent = '找到合适画面后，点“抓取当前画面”，再拖动框选封面区域';
+                document.getElementById('coverCaptureFrameBtn').textContent = '抓取当前画面';
+                document.getElementById('coverCaptureUploadBtn').disabled = true;
+                coverFrameCanvas = null;
+                coverCropRect = null;
+
+                coverStream.getVideoTracks()[0].addEventListener('ended', closeCoverCapture);
+            } catch (error) {
+                console.error('屏幕捕获失败:', error);
+                if (error && error.name !== 'NotAllowedError') {
+                    alert('屏幕捕获失败: ' + error.message);
+                }
+            }
+        }
+
+        function captureCoverFrame() {
+            const video = document.getElementById('coverCaptureVideo');
+            const canvas = document.getElementById('coverCaptureCanvas');
+            if (!video.videoWidth) {
+                alert('还没有画面，请稍后再试');
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            coverFrameCanvas = document.createElement('canvas');
+            coverFrameCanvas.width = video.videoWidth;
+            coverFrameCanvas.height = video.videoHeight;
+            coverFrameCanvas.getContext('2d').drawImage(video, 0, 0);
+
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            document.getElementById('coverCaptureTip').textContent = '在画面上按住并拖动，框选要作为封面的区域';
+            document.getElementById('coverCaptureFrameBtn').textContent = '重新抓取画面';
+            document.getElementById('coverCaptureUploadBtn').disabled = true;
+            coverCropRect = null;
+            redrawCoverCanvas();
+        }
+
+        function redrawCoverCanvas() {
+            const canvas = document.getElementById('coverCaptureCanvas');
+            if (!canvas || !coverFrameCanvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(coverFrameCanvas, 0, 0);
+
+            if (coverCropRect) {
+                const { x, y, w, h } = coverCropRect;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+                ctx.fillRect(0, 0, canvas.width, y);
+                ctx.fillRect(0, y + h, canvas.width, canvas.height - y - h);
+                ctx.fillRect(0, y, x, h);
+                ctx.fillRect(x + w, y, canvas.width - x - w, h);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, w, h);
+            }
+        }
+
+        function getCoverCanvasPoint(event) {
+            const canvas = document.getElementById('coverCaptureCanvas');
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: Math.max(0, Math.min(canvas.width, (event.clientX - rect.left) * (canvas.width / rect.width))),
+                y: Math.max(0, Math.min(canvas.height, (event.clientY - rect.top) * (canvas.height / rect.height)))
+            };
+        }
+
+        function setupCoverCropEvents() {
+            const canvas = document.getElementById('coverCaptureCanvas');
+
+            canvas.addEventListener('pointerdown', (event) => {
+                if (!coverFrameCanvas) return;
+                canvas.setPointerCapture(event.pointerId);
+                coverDragStart = getCoverCanvasPoint(event);
+                coverCropRect = null;
+            });
+
+            canvas.addEventListener('pointermove', (event) => {
+                if (!coverDragStart || !coverFrameCanvas) return;
+                const point = getCoverCanvasPoint(event);
+                coverCropRect = {
+                    x: Math.min(coverDragStart.x, point.x),
+                    y: Math.min(coverDragStart.y, point.y),
+                    w: Math.abs(point.x - coverDragStart.x),
+                    h: Math.abs(point.y - coverDragStart.y)
+                };
+                redrawCoverCanvas();
+            });
+
+            canvas.addEventListener('pointerup', () => {
+                coverDragStart = null;
+                if (coverCropRect && coverCropRect.w >= 20 && coverCropRect.h >= 20) {
+                    document.getElementById('coverCaptureUploadBtn').disabled = false;
+                } else {
+                    coverCropRect = null;
+                    redrawCoverCanvas();
+                    document.getElementById('coverCaptureUploadBtn').disabled = true;
+                }
+            });
+        }
+
+        async function uploadCroppedCover() {
+            if (!coverFrameCanvas || !coverCropRect || !currentGame) {
+                alert('请先在画面上框选封面区域');
+                return;
+            }
+
+            const { x, y, w, h } = coverCropRect;
+            const crop = document.createElement('canvas');
+            crop.width = Math.round(w);
+            crop.height = Math.round(h);
+            crop.getContext('2d').drawImage(coverFrameCanvas, x, y, w, h, 0, 0, crop.width, crop.height);
+
+            const blob = await new Promise((resolve) => crop.toBlob(resolve, 'image/jpeg', 0.92));
+            if (!blob) {
+                alert('生成封面图片失败');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                if (!token) throw new Error('登录已过期，请重新登录');
+
+                const prepareResponse = await fetch('/api/upload/prepare', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fileCount: 1, folderName: currentGame.folder_name })
+                });
+                if (!prepareResponse.ok) throw new Error('准备上传失败');
+
+                const { folderName, uploadToken } = await prepareResponse.json();
+                const formData = new FormData();
+                formData.append('folderName', folderName);
+                formData.append('filePath', 'thumbnail.jpg');
+                formData.append('file', new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' }));
+                formData.append('uploadToken', uploadToken);
+
+                const uploadResponse = await fetch('/api/upload/file', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                if (!uploadResponse.ok) throw new Error('封面上传失败');
+
+                const uploadResult = await uploadResponse.json();
+                const updateResponse = await fetch(`/api/games/${currentGame.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: currentGame.title,
+                        title2: currentGame.title2 || null,
+                        title3: currentGame.title3 || null,
+                        title4: currentGame.title4 || null,
+                        description: currentGame.description || '',
+                        entryFile: currentGame.swf_filename,
+                        saveName: currentGame.save_name || null,
+                        thumbnailKey: uploadResult.key
+                    })
+                });
+                if (!updateResponse.ok) throw new Error('更新游戏信息失败');
+
+                alert('封面设置成功！');
+                closeCoverCapture();
+            } catch (error) {
+                console.error('设置封面失败:', error);
+                alert('设置封面失败: ' + error.message);
+            }
+        }
+
+        function closeCoverCapture() {
+            if (coverStream) {
+                coverStream.getTracks().forEach(track => track.stop());
+                coverStream = null;
+            }
+            document.getElementById('coverCaptureOverlay').style.display = 'none';
+            document.getElementById('coverCaptureVideo').srcObject = null;
+            coverFrameCanvas = null;
+            coverCropRect = null;
+            coverDragStart = null;
+        }
+
+        setupCoverCropEvents();
+        checkCoverPermission();
 
         // 初始化语言
         i18n.translatePage();
