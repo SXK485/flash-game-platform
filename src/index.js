@@ -2091,6 +2091,30 @@ LEFT JOIN (
     // 清理评分
     await env.DB.prepare('DELETE FROM ratings WHERE game_id = ?').bind(id).run();
 
+    // 清理标签关联，并重算/清理零使用标签
+    const { results: gameTagRows } = await env.DB.prepare(
+      'SELECT tag_id FROM game_tags WHERE game_id = ?'
+    ).bind(id).all();
+
+    await env.DB.prepare('DELETE FROM game_tags WHERE game_id = ?').bind(id).run();
+
+    for (const row of gameTagRows) {
+      await env.DB.prepare(
+        'UPDATE tags SET use_count = (SELECT COUNT(*) FROM game_tags WHERE tag_id = ?) WHERE id = ?'
+      ).bind(row.tag_id, row.tag_id).run();
+      await env.DB.prepare('DELETE FROM tags WHERE id = ? AND use_count <= 0').bind(row.tag_id).run();
+    }
+
+    // 清理评论及其点赞
+    await env.DB.prepare(
+      'DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE game_id = ?)'
+    ).bind(id).run();
+    await env.DB.prepare('DELETE FROM comments WHERE game_id = ?').bind(id).run();
+
+    // 清理监控数据
+    await env.DB.prepare('DELETE FROM access_logs WHERE game_id = ?').bind(id).run();
+    await env.DB.prepare('DELETE FROM game_stats WHERE game_id = ?').bind(id).run();
+
     // 从数据库删除（即使有部分 R2 文件删除失败，也先保证列表里不再显示）
     await env.DB.prepare('DELETE FROM games WHERE id = ?').bind(id).run();
 
