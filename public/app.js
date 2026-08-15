@@ -397,6 +397,14 @@ function setupEventListeners() {
         performSearch(searchInput.value);
     });
 
+    // 最低评分筛选
+    const ratingFilterSelect = document.getElementById('ratingFilterSelect');
+    if (ratingFilterSelect) {
+        ratingFilterSelect.addEventListener('change', () => {
+            performSearch(searchInput.value);
+        });
+    }
+
     // 我的收藏筛选
     if (favoritesFilterBtn) {
         favoritesFilterBtn.addEventListener('click', () => {
@@ -2267,6 +2275,12 @@ async function loadGames(searchParams = {}) {
         if (titleSearch) params.append('search', titleSearch);
         if (includeTags.length > 0) params.append('tags', includeTags.join(','));
         if (excludeTags.length > 0) params.append('excludeTags', excludeTags.join(','));
+
+        const ratingFilterSelect = document.getElementById('ratingFilterSelect');
+        const minRating = ratingFilterSelect ? parseFloat(ratingFilterSelect.value || '0') : 0;
+        if (Number.isFinite(minRating) && minRating > 0) {
+            params.append('minRating', String(minRating));
+        }
         
         if (params.toString()) url += '?' + params.toString();
         

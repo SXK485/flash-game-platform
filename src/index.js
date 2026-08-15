@@ -646,6 +646,7 @@ async function handleAPI(request, env, path, corsHeaders) {
     
     const includeTags = tagsParam ? tagsParam.split(',').map(t => t.trim().toLowerCase()).filter(t => t) : [];
     const excludeTags = excludeTagsParam ? excludeTagsParam.split(',').map(t => t.trim().toLowerCase()).filter(t => t) : [];
+    const minRating = parseFloat(url.searchParams.get('minRating') || '0');
     
     let query = `SELECT g.*, COALESCE(r.rating_avg, 0) as rating_avg, COALESCE(r.rating_count, 0) as rating_count
 FROM games g
@@ -682,6 +683,12 @@ LEFT JOIN (
       }
     }
     
+    // 最低评分筛选（类似 sankaku：只显示平均分不低于该值的游戏）
+    if (Number.isFinite(minRating) && minRating > 0 && minRating <= 5) {
+      whereConditions.push('r.rating_avg >= ?');
+      params.push(minRating);
+    }
+
     // 标题搜索
     if (search) {
       whereConditions.push('(g.title LIKE ? OR g.title2 LIKE ? OR g.title3 LIKE ? OR g.title4 LIKE ? OR g.description LIKE ?)');
