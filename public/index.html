@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Flash游戏">
     
     <!-- SEO Meta Tags -->
     <title>Flash 游戏平台 - 在线播放经典 Flash 游戏 | Ruffle 播放器</title>
@@ -270,5 +276,12 @@
     </div>
 
     <script src="/app.js?v=16"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW 注册失败:', err));
+            });
+        }
+    </script>
 </body>
 </html>

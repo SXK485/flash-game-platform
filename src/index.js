@@ -53,7 +53,8 @@ async function getStaticAsset(request, env) {
   const mappedPath = assetManifest[assetKey] || assetKey;
   
   try {
-    const asset = await env.__STATIC_CONTENT.get(mappedPath, { type: 'stream' });
+    const isHtml = path.endsWith('.html');
+    const asset = await env.__STATIC_CONTENT.get(mappedPath, { type: isHtml ? 'text' : 'stream' });
     
     if (!asset) {
       return new Response('Not Found', { status: 404 });
@@ -61,11 +62,27 @@ async function getStaticAsset(request, env) {
     
     // 设置正确的 Content-Type
     const contentType = getContentType(path);
-    // HTML 不缓存（保证页面结构更新后立即可见）；
-    // JS/CSS 等资源短缓存 5 分钟，避免浏览器长期使用旧版本。
-    const cacheControl = path.endsWith('.html')
-      ? 'no-cache, must-revalidate'
-      : 'public, max-age=300';
+
+    // HTML：每次都用 no-cache，并在返回前把本地 JS/CSS 引用改写为“内容哈希版本号”
+    if (isHtml) {
+      const html = typeof asset === 'string' ? asset : await asset.text();
+      const rewrittenHtml = injectAssetVersions(html);
+
+      return new Response(rewrittenHtml, {
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'no-cache, must-revalidate',
+        },
+      });
+    }
+
+    // 非 HTML：带正确内容哈希的 URL 可以永久缓存；
+    // 裸 URL 或旧版本号回退为 no-cache，避免浏览器抱着旧文件不放。
+    const requestedVersion = url.searchParams.get('v') || '';
+    const currentVersion = getAssetVersion(assetKey);
+    const cacheControl = (requestedVersion && requestedVersion === currentVersion)
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache, must-revalidate';
 
     return new Response(asset, {
       headers: {
@@ -76,6 +93,37 @@ async function getStaticAsset(request, env) {
   } catch (e) {
     return new Response('Not Found', { status: 404 });
   }
+}
+
+// 把 HTML 里的本地静态资源引用替换为 ?v=<内容哈希>
+function injectAssetVersions(html) {
+  let rewritten = html;
+  const localAssets = ['app.js', 'i18n.js', 'style.css', 'jszip.min.js'];
+
+  for (const assetKey of localAssets) {
+    const version = getAssetVersion(assetKey);
+    if (!version) {
+      continue;
+    }
+
+    // 匹配 "/app.js"、"/app.js?v=16" 后面紧跟引号的情况
+    const escapedPath = `/${assetKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
+    const pattern = new RegExp(`(${escapedPath})(\\?v=[^"']*)?(["'])`, 'g');
+    rewritten = rewritten.replace(pattern, `$1?v=${version}$3`);
+  }
+
+  return rewritten;
+}
+
+// 从静态资源清单里取出当前内容哈希（如 app.2717ddf31b.js -> 2717ddf31b）
+function getAssetVersion(assetKey) {
+  const mappedPath = assetManifest[assetKey];
+  if (!mappedPath || typeof mappedPath !== 'string') {
+    return '';
+  }
+
+  const match = mappedPath.match(/\.([0-9a-f]{8,})\.[^.]+$/);
+  return match ? match[1] : '';
 }
 
 function getContentType(path) {
@@ -91,6 +139,9 @@ function getContentType(path) {
     'gif': 'image/gif',
     'svg': 'image/svg+xml',
     'ico': 'image/x-icon',
+    'webmanifest': 'application/manifest+json',
+    'txt': 'text/plain; charset=utf-8',
+    'xml': 'application/xml; charset=utf-8',
   };
   return types[ext] || 'application/octet-stream';
 }
