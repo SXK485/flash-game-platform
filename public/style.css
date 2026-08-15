@@ -508,6 +508,11 @@ textarea:focus {
     padding-top: 8px;
 }
 
+.game-rating {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
 .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -1221,6 +1226,61 @@ textarea {
     flex: 0 1 auto;
 }
 
+/* 游戏评分 */
+.rating-widget {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.rating-widget-label {
+    font-size: 13px;
+    color: #666;
+}
+
+.rating-stars {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.rating-star {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    color: #d8d8d8;
+    transition: color 0.15s, transform 0.15s;
+}
+
+.rating-star:not(:disabled):hover {
+    transform: scale(1.15);
+}
+
+.rating-star.active {
+    color: #f59e0b;
+}
+
+.rating-star:disabled {
+    cursor: default;
+    opacity: 0.9;
+}
+
+.rating-info {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f59e0b;
+}
+
+.rating-hint {
+    width: 100%;
+    font-size: 12px;
+    color: #999;
+}
+
 .game-header-info h1 {
     margin-bottom: 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1863,6 +1923,15 @@ textarea {
         flex-wrap: wrap;
         gap: 8px 14px;
         font-size: 12px;
+    }
+
+    .rating-widget {
+        margin-top: 10px;
+        gap: 6px;
+    }
+
+    .rating-star {
+        font-size: 20px;
     }
 
     .game-actions {

@@ -557,6 +557,86 @@ async function handleAPI(request, env, path, corsHeaders) {
     return jsonResponse({ success: true }, 200, corsHeaders);
   }
 
+  // 获取当前设备对某游戏的评分状态
+  if (path === '/api/ratings' && method === 'GET') {
+    const url = new URL(request.url);
+    const deviceId = (url.searchParams.get('deviceId') || '').trim();
+    const gameId = parseInt(url.searchParams.get('gameId'), 10);
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+    }
+
+    const [myRating, played, aggregate] = await Promise.all([
+      env.DB.prepare('SELECT rating FROM ratings WHERE device_id = ? AND game_id = ?').bind(deviceId, gameId).first(),
+      env.DB.prepare('SELECT id FROM play_history WHERE device_id = ? AND game_id = ?').bind(deviceId, gameId).first(),
+      env.DB.prepare('SELECT ROUND(AVG(rating), 1) as rating_avg, COUNT(*) as rating_count FROM ratings WHERE game_id = ?').bind(gameId).first()
+    ]);
+
+    return jsonResponse({
+      rating: myRating ? myRating.rating : null,
+      canRate: !!played,
+      ratingAvg: aggregate.rating_avg || 0,
+      ratingCount: aggregate.rating_count || 0
+    }, 200, corsHeaders);
+  }
+
+  // 提交或修改评分（玩过该游戏的匿名设备才能评）
+  if (path === '/api/ratings' && method === 'POST') {
+    const body = await request.json();
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const gameId = parseInt(body.gameId, 10);
+    const rating = parseInt(body.rating, 10);
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+    }
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return jsonResponse({ error: '评分必须是 1-5 星' }, 400, corsHeaders);
+    }
+
+    const game = await env.DB.prepare('SELECT id FROM games WHERE id = ?').bind(gameId).first();
+    if (!game) {
+      return jsonResponse({ error: '游戏不存在' }, 404, corsHeaders);
+    }
+
+    const played = await env.DB.prepare(
+      'SELECT id FROM play_history WHERE device_id = ? AND game_id = ?'
+    ).bind(deviceId, gameId).first();
+
+    if (!played) {
+      return jsonResponse({ error: '玩过该游戏后才能评分', canRate: false }, 403, corsHeaders);
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO ratings (device_id, game_id, rating, created_date, updated_date)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(device_id, game_id) DO UPDATE SET
+        rating = excluded.rating,
+        updated_date = CURRENT_TIMESTAMP
+    `).bind(deviceId, gameId, rating).run();
+
+    const aggregate = await env.DB.prepare(
+      'SELECT ROUND(AVG(rating), 1) as rating_avg, COUNT(*) as rating_count FROM ratings WHERE game_id = ?'
+    ).bind(gameId).first();
+
+    return jsonResponse({
+      success: true,
+      rating,
+      ratingAvg: aggregate.rating_avg || 0,
+      ratingCount: aggregate.rating_count || 0
+    }, 200, corsHeaders);
+  }
+
   // 获取游戏列表
   if (path === '/api/games' && method === 'GET') {
     const url = new URL(request.url);
@@ -567,7 +647,13 @@ async function handleAPI(request, env, path, corsHeaders) {
     const includeTags = tagsParam ? tagsParam.split(',').map(t => t.trim().toLowerCase()).filter(t => t) : [];
     const excludeTags = excludeTagsParam ? excludeTagsParam.split(',').map(t => t.trim().toLowerCase()).filter(t => t) : [];
     
-    let query = 'SELECT DISTINCT g.* FROM games g';
+    let query = `SELECT g.*, COALESCE(r.rating_avg, 0) as rating_avg, COALESCE(r.rating_count, 0) as rating_count
+FROM games g
+LEFT JOIN (
+  SELECT game_id, ROUND(AVG(rating), 1) as rating_avg, COUNT(*) as rating_count
+  FROM ratings
+  GROUP BY game_id
+) r ON r.game_id = g.id`;
     let params = [];
     let whereConditions = [];
     
@@ -645,7 +731,16 @@ async function handleAPI(request, env, path, corsHeaders) {
   // 获取单个游戏详情
   if (path.match(/^\/api\/games\/\d+$/) && method === 'GET') {
     const id = path.split('/').pop();
-    const game = await env.DB.prepare('SELECT * FROM games WHERE id = ?').bind(id).first();
+    const game = await env.DB.prepare(`
+      SELECT g.*, COALESCE(r.rating_avg, 0) as rating_avg, COALESCE(r.rating_count, 0) as rating_count
+      FROM games g
+      LEFT JOIN (
+        SELECT game_id, ROUND(AVG(rating), 1) as rating_avg, COUNT(*) as rating_count
+        FROM ratings
+        GROUP BY game_id
+      ) r ON r.game_id = g.id
+      WHERE g.id = ?
+    `).bind(id).first();
     
     if (!game) {
       return jsonResponse({ error: '游戏不存在' }, 404, corsHeaders);
@@ -1877,6 +1972,9 @@ async function handleAPI(request, env, path, corsHeaders) {
 
     // 清理最近游玩记录
     await env.DB.prepare('DELETE FROM play_history WHERE game_id = ?').bind(id).run();
+
+    // 清理评分
+    await env.DB.prepare('DELETE FROM ratings WHERE game_id = ?').bind(id).run();
 
     // 从数据库删除（即使有部分 R2 文件删除失败，也先保证列表里不再显示）
     await env.DB.prepare('DELETE FROM games WHERE id = ?').bind(id).run();

@@ -128,6 +128,23 @@ CREATE INDEX IF NOT EXISTS idx_play_history_device ON play_history(device_id, la
 CREATE INDEX IF NOT EXISTS idx_play_history_game ON play_history(game_id);
 
 -- ============================================
+-- 4.7 游戏评分（匿名设备 ID，玩过才能评）
+-- ============================================
+CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    game_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(device_id, game_id),
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ratings_game ON ratings(game_id);
+CREATE INDEX IF NOT EXISTS idx_ratings_device ON ratings(device_id);
+
+-- ============================================
 -- 5. 监控系统
 -- ============================================
 CREATE TABLE IF NOT EXISTS access_logs (

@@ -126,6 +126,79 @@
             btn.classList.toggle('active', isFavorite);
             btn.innerHTML = isFavorite ? '❤️ ' + i18n.t('favorites.added') : '🤍 ' + i18n.t('favorites.add');
         }
+
+        // ==================== 游戏评分 ====================
+        let currentUserRating = null;
+        let currentCanRate = false;
+
+        async function loadRatingState(gameId, initialAvg, initialCount) {
+            renderRatingWidget(gameId, initialAvg, initialCount);
+
+            try {
+                const response = await fetch(`/api/ratings?deviceId=${encodeURIComponent(getVisitorDeviceId())}&gameId=${gameId}`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                currentUserRating = data.rating;
+                currentCanRate = data.canRate;
+                renderRatingWidget(gameId, data.ratingAvg, data.ratingCount);
+            } catch (error) {
+                console.error('加载评分失败:', error);
+            }
+        }
+
+        function renderRatingWidget(gameId, avg, count) {
+            const stars = document.getElementById('ratingStars');
+            const info = document.getElementById('ratingInfo');
+            const hint = document.getElementById('ratingHint');
+            if (!stars || !info || !hint) return;
+
+            const shownRating = currentUserRating || Math.round(Number(avg) || 0);
+            stars.innerHTML = [1, 2, 3, 4, 5].map(value => `
+                <button type="button" class="rating-star ${value <= shownRating ? 'active' : ''}" data-rating="${value}"
+                    ${currentCanRate ? '' : 'disabled'}
+                    onclick="${currentCanRate ? `rateGame(${gameId}, ${value})` : ''}"
+                    title="${value} ${i18n.t('rating.stars')}">${value <= shownRating ? '★' : '☆'}</button>
+            `).join('');
+
+            info.textContent = count > 0
+                ? `★ ${Number(avg).toFixed(1)} (${count})`
+                : i18n.t('rating.noRating');
+
+            hint.style.display = currentCanRate ? 'none' : 'block';
+            hint.textContent = i18n.t('rating.needPlay');
+        }
+
+        async function rateGame(gameId, value) {
+            try {
+                const response = await fetch('/api/ratings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        deviceId: getVisitorDeviceId(),
+                        gameId: gameId,
+                        rating: value
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    alert(i18n.t('rating.submitFailed') + (data.error ? ': ' + data.error : ''));
+                    return;
+                }
+
+                const data = await response.json();
+                currentUserRating = data.rating;
+                currentCanRate = true;
+                renderRatingWidget(gameId, data.ratingAvg, data.ratingCount);
+                alert(i18n.t('rating.submitSuccess'));
+            } catch (error) {
+                console.error('提交评分失败:', error);
+                alert(i18n.t('rating.submitFailed'));
+            }
+        }
         
         // 检查登录状态
         async function checkLoginStatus() {
@@ -255,6 +328,12 @@
                                 <span>📦 ${formatFileSize(game.file_size)}</span>
                                 <span>📅 ${new Date(game.upload_date).toLocaleDateString(i18n.getLanguage())}</span>
                             </div>
+                            <div class="rating-widget">
+                                <span class="rating-widget-label">${i18n.t('rating.title')}</span>
+                                <span class="rating-stars" id="ratingStars"></span>
+                                <span class="rating-info" id="ratingInfo"></span>
+                                <span class="rating-hint" id="ratingHint" style="display: none;"></span>
+                            </div>
                             <div style="margin-top: 16px;">
                                 <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #333;">
                                     🎨 ${i18n.t('game.renderer')}
@@ -288,8 +367,9 @@
 
                 document.getElementById('gameDetail').innerHTML = detailHTML;
 
-                // 加载收藏状态
+                // 加载收藏状态和评分状态
                 loadFavoriteState(id);
+                loadRatingState(id, game.rating_avg || 0, game.rating_count || 0);
             } catch (error) {
                 console.error('[DEBUG] 加载游戏失败:', error);
                 document.getElementById('loading').textContent = '加载失败，请返回重试';

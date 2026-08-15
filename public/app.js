@@ -2371,6 +2371,7 @@ function renderGames(games) {
                     ` : ''}
                     <div class="game-description">${escapeHtml(game.description || i18n.t('game.noDescription'))}</div>
                     <div class="game-meta">
+                        ${game.rating_count > 0 ? `<span class="game-rating">★ ${Number(game.rating_avg).toFixed(1)} (${game.rating_count})</span>` : ''}
                         <span>🎮 ${game.play_count} ${i18n.t('games.plays')}</span>
                         <span>${formatFileSize(game.file_size)}</span>
                     </div>
