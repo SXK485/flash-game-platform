@@ -243,7 +243,29 @@
         }
 
         function findRuffleCanvas() {
-            return document.querySelector('#player-container canvas');
+            const container = document.getElementById('player-container');
+            return container ? findCanvasInTree(container) : null;
+        }
+
+        // Ruffle 的 canvas 可能藏在 ruffle-player 的 Shadow DOM 里，需要递归查找
+        function findCanvasInTree(root) {
+            if (!root) return null;
+
+            if (root.nodeType === 1 && root.tagName === 'CANVAS') {
+                return root;
+            }
+
+            if (root.shadowRoot) {
+                const found = findCanvasInTree(root.shadowRoot);
+                if (found) return found;
+            }
+
+            for (const child of Array.from(root.children || [])) {
+                const found = findCanvasInTree(child);
+                if (found) return found;
+            }
+
+            return null;
         }
 
         function isCanvasBlank(canvas) {
