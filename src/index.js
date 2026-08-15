@@ -24,6 +24,11 @@ export default {
         return handleAPI(request, env, path, corsHeaders);
       }
 
+      // 动态 sitemap（由 D1 游戏数据实时生成）
+      if (path === '/sitemap.xml') {
+        return await handleSitemap(request, env);
+      }
+
       // 文件代理路由（从 R2 获取游戏文件）
       if (path.startsWith('/files/')) {
         return handleFileProxy(request, env, path, corsHeaders);
@@ -37,6 +42,55 @@ export default {
     }
   }
 };
+
+// 动态生成 sitemap.xml：首页 + 所有游戏详情页
+async function handleSitemap(request, env) {
+  try {
+    const url = new URL(request.url);
+    const baseUrl = url.origin;
+    const today = getShanghaiDateString();
+
+    const { results: games } = await env.DB.prepare(
+      'SELECT id, upload_date FROM games ORDER BY upload_date DESC'
+    ).all();
+
+    const toDateOnly = (value) => String(value || '').replace('T', ' ').split(' ')[0];
+
+    const urls = [
+      `<url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>`
+    ];
+
+    for (const game of games) {
+      const lastmod = toDateOnly(game.upload_date) || today;
+      urls.push(`  <url>
+    <loc>${baseUrl}/game.html?id=${game.id}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`);
+    }
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`;
+
+    return new Response(xml, {
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': 'public, max-age=1800',
+      },
+    });
+  } catch (error) {
+    console.error('生成 sitemap 失败:', error);
+    return new Response('Internal server error', { status: 500 });
+  }
+}
 
 // 静态资源处理
 async function getStaticAsset(request, env) {
