@@ -120,7 +120,19 @@ async function getStaticAsset(request, env) {
     // HTML：每次都用 no-cache，并在返回前把本地 JS/CSS 引用改写为“内容哈希版本号”
     if (isHtml) {
       const html = typeof asset === 'string' ? asset : await asset.text();
-      const rewrittenHtml = injectAssetVersions(html);
+      let rewrittenHtml = injectAssetVersions(html);
+
+      // 游戏详情页：服务端把真实标题/描述写入 HTML，方便搜索引擎抓取
+      if (path === '/game.html') {
+        const gameIdParam = url.searchParams.get('id');
+        if (gameIdParam && /^\d+$/.test(gameIdParam)) {
+          try {
+            rewrittenHtml = await injectGameSeo(rewrittenHtml, env, gameIdParam, url.origin);
+          } catch (error) {
+            console.error('注入游戏 SEO 失败:', error);
+          }
+        }
+      }
 
       return new Response(rewrittenHtml, {
         headers: {
@@ -178,6 +190,87 @@ function getAssetVersion(assetKey) {
 
   const match = mappedPath.match(/\.([0-9a-f]{8,})\.[^.]+$/);
   return match ? match[1] : '';
+}
+
+// 游戏详情页 SEO 注入：把真实标题/描述/OG/结构化数据写入 HTML
+async function injectGameSeo(html, env, gameId, baseUrl) {
+  const game = await env.DB.prepare(
+    'SELECT title, title2, title3, title4, description, thumbnail_url, upload_date FROM games WHERE id = ?'
+  ).bind(gameId).first();
+
+  if (!game) {
+    return html;
+  }
+
+  const titles = [game.title, game.title2, game.title3, game.title4].filter(Boolean);
+  const pageTitle = `${game.title} - Flash 游戏平台`;
+  const description = (game.description && game.description.trim())
+    ? game.description.trim()
+    : `${titles.join(' / ')} Flash 在线游戏，使用 Ruffle 播放器在浏览器中直接畅玩。`;
+  const pageUrl = `${baseUrl}/game.html?id=${gameId}`;
+  const imageUrl = game.thumbnail_url && game.thumbnail_url.startsWith('http')
+    ? game.thumbnail_url
+    : game.thumbnail_url && game.thumbnail_url.startsWith('/')
+      ? `${baseUrl}${game.thumbnail_url}`
+      : `${baseUrl}/icon-512.png`;
+  const datePublished = String(game.upload_date || '').replace(' ', 'T') + 'Z';
+
+  const esc = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const jsonEscape = (value) => String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+
+  let result = html;
+
+  // 替换已有 title 和 description
+  result = result.replace(/<title>[\s\S]*?<\/title>/, `<title>${esc(pageTitle)}</title>`);
+  result = result.replace(
+    /<meta name="description" content="[^"]*">/,
+    `<meta name="description" content="${esc(description)}">`
+  );
+  result = result.replace(
+    /<link rel="canonical"[^>]*>/,
+    `<link rel="canonical" href="${esc(pageUrl)}">`
+  );
+
+  const alternateNames = titles.slice(1);
+  const alternateNamesJson = alternateNames.length > 0
+    ? `"alternateName": [${alternateNames.map(name => `"${jsonEscape(name)}"`).join(',')}],`
+    : '';
+
+  const seoBlock = `
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${esc(pageUrl)}">
+    <meta property="og:title" content="${esc(game.title)}">
+    <meta property="og:description" content="${esc(description)}">
+    <meta property="og:image" content="${esc(imageUrl)}">
+    <meta property="og:locale" content="zh_CN">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${esc(game.title)}">
+    <meta name="twitter:description" content="${esc(description)}">
+    <meta name="twitter:image" content="${esc(imageUrl)}">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "${jsonEscape(game.title)}",
+      ${alternateNamesJson}
+      "description": "${jsonEscape(description)}",
+      "url": "${jsonEscape(pageUrl)}",
+      "image": "${jsonEscape(imageUrl)}",
+      "datePublished": "${jsonEscape(datePublished)}",
+      "applicationCategory": "Game"
+    }
+    </script>`;
+
+  return result.replace('</head>', `${seoBlock}\n</head>`);
 }
 
 function getContentType(path) {
