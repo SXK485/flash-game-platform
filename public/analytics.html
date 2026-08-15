@@ -197,6 +197,84 @@
             height: 300px;
             margin-top: 20px;
         }
+
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 监控面板移动端修正 */
+        @media (max-width: 768px) {
+            .analytics-container {
+                padding: 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+                margin-bottom: 16px;
+            }
+
+            .stat-card {
+                padding: 14px 10px;
+            }
+
+            .stat-card h3 {
+                font-size: 12px;
+                margin-bottom: 6px;
+            }
+
+            .stat-card .value {
+                font-size: 22px;
+            }
+
+            .section {
+                padding: 14px 10px;
+                margin-bottom: 16px;
+            }
+
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+
+            .filters select,
+            .filters input {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .game-stats-table,
+            .access-logs-table {
+                min-width: 640px;
+            }
+
+            .pagination {
+                flex-wrap: wrap;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .header-actions select,
+            .header-actions button {
+                width: 100%;
+                margin-right: 0 !important;
+                box-sizing: border-box;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                gap: 8px;
+            }
+
+            .stat-card .value {
+                font-size: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -256,18 +334,20 @@
                 </select>
             </div>
             <div id="gameStatsLoading" class="loading" data-i18n="analytics.loading">加载中...</div>
-            <table class="game-stats-table" id="gameStatsTable" style="display: none;">
-                <thead>
-                    <tr>
-                        <th data-i18n="analytics.gameName">游戏名称</th>
-                        <th data-i18n="analytics.views">访问量</th>
-                        <th data-i18n="analytics.plays">播放量</th>
-                        <th data-i18n="analytics.downloads">下载量</th>
-                        <th data-i18n="analytics.conversionRate">转化率</th>
-                    </tr>
-                </thead>
-                <tbody id="gameStatsBody"></tbody>
-            </table>
+            <div class="table-scroll">
+                <table class="game-stats-table" id="gameStatsTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th data-i18n="analytics.gameName">游戏名称</th>
+                            <th data-i18n="analytics.views">访问量</th>
+                            <th data-i18n="analytics.plays">播放量</th>
+                            <th data-i18n="analytics.downloads">下载量</th>
+                            <th data-i18n="analytics.conversionRate">转化率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gameStatsBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- 访问日志 -->
@@ -287,7 +367,7 @@
                 <button onclick="loadAccessLogs()" class="btn-primary" data-i18n="analytics.filter">筛选</button>
             </div>
             <div id="accessLogsLoading" class="loading" data-i18n="analytics.loading">加载中...</div>
-            <div style="overflow-x: auto;">
+            <div class="table-scroll">
                 <table class="access-logs-table" id="accessLogsTable" style="display: none;">
                     <thead>
                         <tr>
