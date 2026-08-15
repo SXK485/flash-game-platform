@@ -1386,3 +1386,334 @@ textarea {
     font-size: 14px;
     color: #666;
 }
+
+/* ============================================
+   移动端体验优化（手机优先，不只是缩小）
+   ============================================ */
+@media (max-width: 768px) {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        overscroll-behavior-y: none;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px; /* 防止 iOS 聚焦输入框时自动放大页面 */
+    }
+
+    .btn-primary,
+    .btn-secondary,
+    .tab-btn,
+    .mode-tab-btn,
+    .header-select {
+        min-height: 44px; /* 移动端推荐触控尺寸 */
+    }
+
+    /* ---------- 首页头部：吸顶 + 两段式 ---------- */
+    header {
+        position: sticky;
+        top: 0;
+        z-index: 200;
+        padding: 0;
+        margin-bottom: 0;
+        border-radius: 0 0 18px 18px;
+    }
+
+    header .container {
+        gap: 8px;
+        padding: calc(10px + env(safe-area-inset-top)) 12px 12px;
+    }
+
+    header h1 {
+        font-size: 1.3rem;
+        text-align: left;
+        line-height: 1.3;
+    }
+
+    .header-actions {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .search-container {
+        flex: 1 1 100%;
+        order: 1;
+        max-width: none;
+    }
+
+    .search-hint {
+        display: none; /* 手机上隐藏解释文字，减少干扰 */
+    }
+
+    #searchInput {
+        min-height: 44px;
+        padding: 10px 14px;
+        border-radius: 12px;
+    }
+
+    .favorites-filter-btn {
+        order: 2;
+        flex: 1 1 auto;
+    }
+
+    .header-select {
+        order: 3;
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        background: white;
+        color: #333;
+    }
+
+    #sortSelect {
+        order: 4;
+        flex: 1 1 auto;
+    }
+
+    #adminBtn {
+        order: 5;
+        flex: 1 1 auto;
+    }
+
+    /* ---------- 热门标签：横向滑动 ---------- */
+    .hot-tags {
+        margin: 0 12px 12px;
+        padding: 10px 6px;
+        border-radius: 14px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .hot-tags::-webkit-scrollbar {
+        display: none;
+    }
+
+    .hot-tags-list {
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .hot-tags-label {
+        flex: 0 0 auto;
+    }
+
+    .hot-tag-btn {
+        flex: 0 0 auto;
+        min-height: 36px;
+        padding: 7px 12px;
+        border-radius: 18px;
+        font-size: 12px;
+    }
+
+    /* ---------- 游戏网格：2 列卡片，突出封面 ---------- */
+    main.container {
+        padding: 0;
+    }
+
+    .game-grid {
+        padding: 0 12px calc(24px + env(safe-area-inset-bottom));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .game-card {
+        border-radius: 12px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+    }
+
+    .game-thumbnail {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 4 / 3;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .game-info {
+        padding: 9px 9px 10px;
+    }
+
+    .game-title {
+        font-size: 13px;
+        line-height: 1.35;
+        min-height: 0;
+        margin-bottom: 5px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .game-tags {
+        gap: 4px;
+        margin-bottom: 5px;
+        min-height: 18px;
+    }
+
+    .game-tags .tag {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 9px;
+        padding: 2px 6px;
+        height: 16px;
+        line-height: 12px;
+    }
+
+    .game-description {
+        display: none; /* 手机上卡片只保留封面、标题、标签和播放量 */
+    }
+
+    .game-meta {
+        flex-direction: column;
+        gap: 2px;
+        font-size: 11px;
+        padding-top: 4px;
+    }
+
+    .game-info .btn-secondary,
+    .game-info .btn-danger {
+        font-size: 11px;
+        padding: 7px 6px;
+        min-height: 34px;
+    }
+
+    .favorite-btn {
+        width: 32px;
+        height: 32px;
+        top: 7px;
+        right: 7px;
+        font-size: 15px;
+    }
+
+    /* ---------- 模态框：手机上改为底部弹层 ---------- */
+    .modal.active {
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: none;
+        max-height: 92vh;
+        border-radius: 18px 18px 0 0;
+        padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+    }
+
+    .modal-content h2 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+    }
+
+    /* ---------- 详情页：封面置顶 + 底部固定操作条 ---------- */
+    body.game-page {
+        padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    }
+
+    body.game-page header {
+        margin-bottom: 12px;
+    }
+
+    .game-detail {
+        padding: 14px;
+        margin: 0 12px 12px;
+        border-radius: 16px;
+    }
+
+    .game-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .game-detail-thumbnail {
+        width: 100%;
+        height: auto;
+        max-height: 260px;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        border-radius: 14px;
+    }
+
+    .game-header-info h1 {
+        font-size: 1.35rem;
+        line-height: 1.35;
+        margin-bottom: 10px;
+    }
+
+    .game-header-info .game-description {
+        font-size: 14px;
+        line-height: 1.6;
+        margin: 10px 0;
+    }
+
+    .game-header-info .game-meta {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        font-size: 12px;
+    }
+
+    .game-actions {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        z-index: 300;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 16px;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .game-actions button {
+        flex: 1 1 auto;
+        min-height: 44px;
+        padding: 10px 12px;
+        font-size: 13px;
+        white-space: normal;
+    }
+
+    .comments-section {
+        margin: 0 12px calc(12px + env(safe-area-inset-bottom));
+        padding: 16px 14px;
+        border-radius: 16px;
+    }
+
+    /* ---------- 播放页安全区 ---------- */
+    #back-btn {
+        top: calc(10px + env(safe-area-inset-top));
+        left: calc(10px + env(safe-area-inset-left));
+    }
+}
+
+@media (max-width: 480px) {
+    .game-grid {
+        gap: 8px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .game-info {
+        padding: 8px;
+    }
+
+    .game-title {
+        font-size: 12px;
+    }
+}

@@ -26,7 +26,7 @@
     <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body>
+<body class="game-page">
     <header>
         <div class="container">
             <h1 data-i18n="app.title" onclick="window.location.href='/'" style="cursor: pointer;" title="返回首页">🎮 Flash 游戏平台</h1>
@@ -270,7 +270,7 @@
                                     💡 ${i18n.t('game.renderer.tip')}
                                 </p>
                             </div>
-                            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                            <div class="game-actions" style="display: flex; gap: 12px; margin-top: 20px;">
                                 <button id="favoriteGameBtn" class="btn-secondary" onclick="toggleFavoriteFromDetail(${game.id})">
                                     🤍 ${i18n.t('favorites.add')}
                                 </button>
