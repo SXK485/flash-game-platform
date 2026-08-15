@@ -221,6 +221,35 @@
             window.location.href = '/';
         }
 
+        // 管理员登录后，给 WebGL canvas 开启 preserveDrawingBuffer，
+        // 这样 Ruffle 保持 WebGL 渲染的同时，画面可以被截图读取。
+        function maybeEnableWebglCapture() {
+            if (!localStorage.getItem('adminToken')) {
+                return;
+            }
+
+            const patchContext = (proto) => {
+                if (!proto || proto.__rufflePreservePatched) {
+                    return;
+                }
+                const originalGetContext = proto.getContext;
+                proto.getContext = function(type, options) {
+                    if (type === 'webgl' || type === 'webgl2') {
+                        options = Object.assign({}, options || {}, { preserveDrawingBuffer: true });
+                    }
+                    return originalGetContext.call(this, type, options);
+                };
+                Object.defineProperty(proto, '__rufflePreservePatched', { value: true });
+            };
+
+            patchContext(HTMLCanvasElement.prototype);
+            if (window.OffscreenCanvas) {
+                patchContext(OffscreenCanvas.prototype);
+            }
+        }
+
+        maybeEnableWebglCapture();
+
         // ==================== 管理员从 Flash 画布截取封面 ====================
         let coverFrameCanvas = null;
         let coverCropRect = null;
@@ -355,7 +384,7 @@
 
             const frame = await captureRuffleFrame(sourceCanvas);
             if (!frame) {
-                alert('无法直接抓取当前 Flash 画面。可能因为当前使用 WebGL 渲染器。\n\n解决方法：在游戏详情页把“渲染器”切换为 Canvas2D，再进入游戏后重新点击“设为封面”。');
+                alert('无法读取当前 Flash 画布。请刷新播放页让游戏重新加载后再试；如果仍失败，可以使用系统截图工具截图，或告诉我具体现象。');
                 return;
             }
 
