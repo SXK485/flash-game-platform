@@ -82,11 +82,27 @@
     </style>
 </head>
 <body>
-    <button id="back-btn" onclick="window.close()" data-i18n="app.back">← 返回</button>
+    <button id="back-btn" onclick="goBack()" data-i18n="app.back">← 返回</button>
     <div id="player-container">
         <div id="loading" data-i18n="app.loading">加载中...</div>
     </div>
     <script>
+        // 返回上一页；没有站内来源时回首页
+        function goBack() {
+            try {
+                if (document.referrer) {
+                    const referrer = new URL(document.referrer);
+                    if (referrer.host === window.location.host && history.length > 1) {
+                        history.back();
+                        return;
+                    }
+                }
+            } catch (error) {
+                // 忽略 referrer 解析错误，直接回首页
+            }
+            window.location.href = '/';
+        }
+
         // 初始化语言
         i18n.translatePage();
         const params = new URLSearchParams(window.location.search);
