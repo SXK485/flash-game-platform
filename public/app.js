@@ -2270,7 +2270,7 @@ async function loadGames(searchParams = {}) {
         
         if (params.toString()) url += '?' + params.toString();
         
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         let games = await response.json();
 
         // 应用排序

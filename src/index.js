@@ -1860,10 +1860,16 @@ async function handleAPI(request, env, path, corsHeaders) {
       return jsonResponse({ error: '游戏不存在' }, 404, corsHeaders);
     }
 
-    // 从 R2 删除文件
+    // 从 R2 删除文件：单个文件失败不阻断整体删除，避免出现“文件删了、数据库记录还在”
     const objects = await env.FLASH_STORAGE.list({ prefix: `${game.folder_name}/` });
+    const deleteErrors = [];
     for (const obj of objects.objects) {
-      await env.FLASH_STORAGE.delete(obj.key);
+      try {
+        await env.FLASH_STORAGE.delete(obj.key);
+      } catch (error) {
+        deleteErrors.push(obj.key);
+        console.error(`删除 R2 对象失败: ${obj.key}`, error);
+      }
     }
 
     // 清理收藏关系（D1 可能未开启外键级联，这里显式删除）
@@ -1872,10 +1878,13 @@ async function handleAPI(request, env, path, corsHeaders) {
     // 清理最近游玩记录
     await env.DB.prepare('DELETE FROM play_history WHERE game_id = ?').bind(id).run();
 
-    // 从数据库删除
+    // 从数据库删除（即使有部分 R2 文件删除失败，也先保证列表里不再显示）
     await env.DB.prepare('DELETE FROM games WHERE id = ?').bind(id).run();
 
-    return jsonResponse({ message: '删除成功' }, 200, corsHeaders);
+    return jsonResponse({
+      message: '删除成功',
+      warnings: deleteErrors.length > 0 ? deleteErrors.length : undefined
+    }, 200, corsHeaders);
   }
 
   // 获取文件（从 R2）
