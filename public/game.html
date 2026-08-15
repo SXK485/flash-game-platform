@@ -364,7 +364,7 @@
                             <h1>${escapeHtml(game.title)}</h1>
                             ${game.tags && game.tags.length > 0 ? `
                                 <div class="game-tags">
-                                    ${game.tags.map(tag => `<span class="tag">${escapeHtml(tag.name)}</span>`).join('')}
+                                    ${game.tags.map(tag => `<span class="tag tag-type-${tagTypeClass(tag.type)}" title="${escapeHtml(tagTypeLabel(tag.type))}">${escapeHtml(tag.name)}</span>`).join('')}
                                 </div>
                             ` : ''}
                             <p class="game-description">${escapeHtml(game.description || i18n.t('game.noDescription'))}</p>
@@ -658,6 +658,15 @@
         function coverGradient(gameId) {
             const hue = (Number(gameId) * 47) % 360;
             return `linear-gradient(135deg, hsl(${hue}, 70%, 52%), hsl(${(hue + 45) % 360}, 72%, 34%))`;
+        }
+
+        function tagTypeClass(type) {
+            const allowed = ['general', 'author', 'character', 'body', 'action', 'warning'];
+            return allowed.includes(type) ? type : 'general';
+        }
+
+        function tagTypeLabel(type) {
+            return i18n.t(`tag.type.${tagTypeClass(type)}`, type || 'general');
         }
 
         function escapeHtml(text) {

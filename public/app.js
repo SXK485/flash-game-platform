@@ -73,6 +73,17 @@ function coverGradient(gameId) {
     return `linear-gradient(135deg, hsl(${hue}, 70%, 52%), hsl(${(hue + 45) % 360}, 72%, 34%))`;
 }
 
+// 标签类型样式和文案
+function tagTypeClass(type) {
+    const allowed = ['general', 'author', 'character', 'body', 'action', 'warning'];
+    return allowed.includes(type) ? type : 'general';
+}
+
+function tagTypeLabel(type) {
+    const key = `tag.type.${tagTypeClass(type)}`;
+    return i18n.t(key, type || 'general');
+}
+
 // 渲染最近游玩区域
 function renderRecentGames() {
     if (!recentGamesSection || !recentGamesList) {
@@ -401,6 +412,14 @@ function setupEventListeners() {
     const ratingFilterSelect = document.getElementById('ratingFilterSelect');
     if (ratingFilterSelect) {
         ratingFilterSelect.addEventListener('change', () => {
+            performSearch(searchInput.value);
+        });
+    }
+
+    // 标签类型筛选
+    const tagTypeFilterSelect = document.getElementById('tagTypeFilterSelect');
+    if (tagTypeFilterSelect) {
+        tagTypeFilterSelect.addEventListener('change', () => {
             performSearch(searchInput.value);
         });
     }
@@ -796,6 +815,7 @@ function showAdminMenu() {
             <button onclick="window.location.href='/analytics.html'; closeAdminMenu()">📊 ${i18n.t('admin.analytics')}</button>
             <button onclick="showAdminManagement(); closeAdminMenu()">👥 ${i18n.t('admin.manageAdmins')}</button>
             <button onclick="showSiteSettings(); closeAdminMenu()">⚙️ ${i18n.t('admin.siteSettings')}</button>
+            <button onclick="showTagManager(); closeAdminMenu()">🏷️ ${i18n.t('tag.manager.title')}</button>
             <button onclick="logout()">🚪 ${i18n.t('nav.logout')}</button>
         </div>
     `;
@@ -1247,6 +1267,91 @@ async function deleteAdmin(adminId) {
     } catch (error) {
         console.error('删除失败:', error);
         alert(i18n.t('game.deleteFailed'));
+    }
+}
+
+// ==================== 标签管理 ====================
+async function showTagManager() {
+    try {
+        const response = await fetch('/api/tags');
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        const tags = await response.json();
+
+        const typeOptions = ['general', 'author', 'character', 'body', 'action', 'warning']
+            .map(type => `<option value="${type}">${i18n.t(`tag.type.${type}`, type)}</option>`)
+            .join('');
+
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'tagManagerModal';
+        modal.innerHTML = `
+            <div class="modal-content tag-manager-content">
+                <span class="close" onclick="closeTagManager()">&times;</span>
+                <h2>🏷️ ${i18n.t('tag.manager.title')}</h2>
+                <p class="tag-manager-hint">${i18n.t('tag.manager.hint')}</p>
+                <div class="tag-manager-list">
+                    ${tags.map(tag => `
+                        <div class="tag-manager-item">
+                            <div class="tag-manager-name">
+                                <span class="tag tag-type-${tagTypeClass(tag.type)}">${escapeHtml(tag.name)}</span>
+                                <span class="tag-manager-count">${tag.use_count}</span>
+                            </div>
+                            <div class="tag-manager-fields">
+                                <select data-tag-type="${tag.id}">
+                                    ${typeOptions.replace(`value="${tagTypeClass(tag.type)}"`, `value="${tagTypeClass(tag.type)}" selected`)}
+                                </select>
+                                <input type="text" data-tag-desc="${tag.id}" value="${escapeHtml(tag.description || '')}" placeholder="${i18n.t('tag.manager.descriptionPlaceholder')}">
+                                <button class="btn-primary" onclick="saveTagInfo(${tag.id})">${i18n.t('tag.manager.save')}</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('加载标签管理失败:', error);
+        alert(i18n.t('tags.loadFailed') || i18n.t('settings.loadFailed'));
+    }
+}
+
+function closeTagManager() {
+    const modal = document.getElementById('tagManagerModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function saveTagInfo(tagId) {
+    const typeSelect = document.querySelector(`[data-tag-type="${tagId}"]`);
+    const descInput = document.querySelector(`[data-tag-desc="${tagId}"]`);
+    if (!typeSelect || !descInput) return;
+
+    try {
+        const response = await fetch(`/api/tags/${tagId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: typeSelect.value,
+                description: descInput.value.trim()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+
+        alert(i18n.t('tag.manager.saveSuccess'));
+        loadTags();
+        performSearch(searchInput.value);
+    } catch (error) {
+        console.error('保存标签失败:', error);
+        alert(i18n.t('tag.manager.saveFailed'));
     }
 }
 
@@ -2203,7 +2308,7 @@ function renderHotTags() {
         <div class="hot-tags-label">🔥 ${i18n.t('games.hotTags')}：</div>
         <div class="hot-tags-list">
             ${topTags.map(tag => `
-                <button class="hot-tag-btn" onclick="searchByTag('${escapeHtml(tag.name)}')">
+                <button class="hot-tag-btn tag-type-${tagTypeClass(tag.type)}" onclick="searchByTag('${escapeHtml(tag.name)}')" title="${escapeHtml(tagTypeLabel(tag.type))}">
                     ${escapeHtml(tag.name)} <span class="tag-count">${tag.use_count}</span>
                 </button>
             `).join('')}
@@ -2280,6 +2385,12 @@ async function loadGames(searchParams = {}) {
         const minRating = ratingFilterSelect ? parseFloat(ratingFilterSelect.value || '0') : 0;
         if (Number.isFinite(minRating) && minRating > 0) {
             params.append('minRating', String(minRating));
+        }
+
+        const tagTypeFilterSelect = document.getElementById('tagTypeFilterSelect');
+        const tagType = tagTypeFilterSelect ? (tagTypeFilterSelect.value || '').trim() : '';
+        if (tagType) {
+            params.append('tagType', tagType);
         }
         
         if (params.toString()) url += '?' + params.toString();
@@ -2380,7 +2491,7 @@ function renderGames(games) {
                     <div class="game-title">${escapeHtml(game.title)}</div>
                     ${game.tags && game.tags.length > 0 ? `
                         <div class="game-tags">
-                            ${game.tags.map(tag => `<span class="tag" onclick="event.stopPropagation(); filterByTag('${escapeHtml(tag.name)}')">${escapeHtml(tag.name)}</span>`).join('')}
+                            ${game.tags.map(tag => `<span class="tag tag-type-${tagTypeClass(tag.type)}" title="${escapeHtml(tagTypeLabel(tag.type))}" onclick="event.stopPropagation(); filterByTag('${escapeHtml(tag.name)}')">${escapeHtml(tag.name)}</span>`).join('')}
                         </div>
                     ` : ''}
                     <div class="game-description">${escapeHtml(game.description || i18n.t('game.noDescription'))}</div>

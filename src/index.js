@@ -737,6 +737,17 @@ LEFT JOIN (
       params.push(minRating);
     }
 
+    // 标签类型筛选（作者/角色/身体特征/动作姿势/警告）
+    const tagType = (url.searchParams.get('tagType') || '').trim().toLowerCase();
+    if (tagType && isValidTagType(tagType)) {
+      whereConditions.push(`EXISTS (
+        SELECT 1 FROM game_tags gtt
+        INNER JOIN tags tt ON gtt.tag_id = tt.id
+        WHERE gtt.game_id = g.id AND LOWER(tt.type) = ?
+      )`);
+      params.push(tagType);
+    }
+
     // 标题搜索
     if (search) {
       whereConditions.push('(g.title LIKE ? OR g.title2 LIKE ? OR g.title3 LIKE ? OR g.title4 LIKE ? OR g.description LIKE ?)');
@@ -1474,15 +1485,57 @@ LEFT JOIN (
     return jsonResponse(results, 200, corsHeaders);
   }
 
+  // 编辑 tag 类型和描述（需要管理员权限）
+  if (path.match(/^\/api\/tags\/\d+$/) && method === 'PUT') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const tagId = path.split('/').pop();
+    const body = await request.json();
+    const type = typeof body.type === 'string' ? body.type.trim().toLowerCase() : '';
+    const description = typeof body.description === 'string' ? body.description.trim() : '';
+
+    if (type && !isValidTagType(type)) {
+      return jsonResponse({ error: '标签类型无效' }, 400, corsHeaders);
+    }
+
+    if (description.length > 500) {
+      return jsonResponse({ error: '标签描述不能超过500字' }, 400, corsHeaders);
+    }
+
+    const tag = await env.DB.prepare('SELECT id FROM tags WHERE id = ?').bind(tagId).first();
+    if (!tag) {
+      return jsonResponse({ error: '标签不存在' }, 404, corsHeaders);
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (type) {
+      updates.push('type = ?');
+      params.push(type);
+    }
+    updates.push('description = ?');
+    params.push(description);
+    updates.push('updated_date = CURRENT_TIMESTAMP');
+    params.push(tagId);
+
+    await env.DB.prepare(`UPDATE tags SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+
+    return jsonResponse({ message: '标签更新成功' }, 200, corsHeaders);
+  }
+
   // 为游戏添加 tags（需要管理员权限）
   if (path.match(/^\/api\/games\/\d+\/tags$/) && method === 'POST') {
-    if (!await checkAuth(request, env)) {
+    const auth = await checkAuth(request, env);
+    if (!auth) {
       return jsonResponse({ error: '未授权' }, 401, corsHeaders);
     }
 
     const gameId = path.split('/')[3];
     const body = await request.json();
-    const { tags } = body; // tags: ['tag1', 'tag2', ...]
+    const { tags } = body; // tags: ['tag1', 'tag2', ...] 或 [{name, type, description}]
 
     if (!tags || !Array.isArray(tags) || tags.length === 0) {
       return jsonResponse({ error: '缺少 tags' }, 400, corsHeaders);
@@ -1495,24 +1548,31 @@ LEFT JOIN (
     }
 
     // 为每个 tag 创建或获取 ID，然后关联到游戏
-    for (const tagName of tags) {
-      const trimmedTag = tagName.trim().toLowerCase();
+    for (const tagItem of tags) {
+      const rawName = typeof tagItem === 'string' ? tagItem : (tagItem && typeof tagItem.name === 'string' ? tagItem.name : '');
+      const trimmedTag = rawName.trim().toLowerCase();
       if (!trimmedTag) continue;
+
+      const requestedType = typeof tagItem === 'object' && tagItem ? String(tagItem.type || '').trim().toLowerCase() : '';
+      const requestedDescription = typeof tagItem === 'object' && tagItem ? String(tagItem.description || '').trim().slice(0, 500) : '';
 
       // 查找或创建 tag
       let tag = await env.DB.prepare('SELECT id FROM tags WHERE name = ?').bind(trimmedTag).first();
       
       if (!tag) {
         // 创建新 tag
-        const result = await env.DB.prepare('INSERT INTO tags (name, use_count) VALUES (?, 1)').bind(trimmedTag).run();
+        const tagType = isValidTagType(requestedType) ? requestedType : 'general';
+        const result = await env.DB.prepare(
+          'INSERT INTO tags (name, use_count, type, description, created_by, updated_date) VALUES (?, 1, ?, ?, ?, CURRENT_TIMESTAMP)'
+        ).bind(trimmedTag, tagType, requestedDescription, auth.username).run();
         tag = { id: result.meta.last_row_id };
         
         // 关联游戏和 tag
-        await env.DB.prepare('INSERT INTO game_tags (game_id, tag_id) VALUES (?, ?)').bind(gameId, tag.id).run();
+        await env.DB.prepare('INSERT INTO game_tags (game_id, tag_id, added_by) VALUES (?, ?, ?)').bind(gameId, tag.id, auth.username).run();
       } else {
         // 标签已存在，尝试关联游戏和 tag
         try {
-          await env.DB.prepare('INSERT INTO game_tags (game_id, tag_id) VALUES (?, ?)').bind(gameId, tag.id).run();
+          await env.DB.prepare('INSERT INTO game_tags (game_id, tag_id, added_by) VALUES (?, ?, ?)').bind(gameId, tag.id, auth.username).run();
           // 只有成功插入关联时才增加使用计数
           await env.DB.prepare('UPDATE tags SET use_count = use_count + 1 WHERE id = ?').bind(tag.id).run();
         } catch (e) {
@@ -2389,6 +2449,12 @@ function getShanghaiDateString(date = new Date()) {
 
   const get = (type) => parts.find(part => part.type === type)?.value || '';
   return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+const TAG_TYPES = ['general', 'author', 'character', 'body', 'action', 'warning'];
+
+function isValidTagType(type) {
+  return TAG_TYPES.includes(type);
 }
 
 function isValidDeviceId(deviceId) {
