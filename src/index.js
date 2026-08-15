@@ -1779,13 +1779,14 @@ async function handleAPI(request, env, path, corsHeaders) {
 
       // 如果有新缩略图
       if (thumbnailKey) {
-        thumbnailUrl = `${env.R2_PUBLIC_URL}/${thumbnailKey}`;
+        // 加版本号避免浏览器/R2 CDN 继续显示旧封面
+        thumbnailUrl = `${env.R2_PUBLIC_URL}/${thumbnailKey}?v=${Date.now()}`;
       } else if (_formData) {
         // FormData 方式的缩略图
         const thumbnail = _formData.get('thumbnail');
         if (thumbnail) {
           await env.FLASH_STORAGE.put(`${finalFolderName}/thumbnail.jpg`, thumbnail);
-          thumbnailUrl = `${env.R2_PUBLIC_URL}/${finalFolderName}/thumbnail.jpg`;
+          thumbnailUrl = `${env.R2_PUBLIC_URL}/${finalFolderName}/thumbnail.jpg?v=${Date.now()}`;
         }
       }
 
