@@ -1268,7 +1268,7 @@ function filterSwfFiles(files) {
 }
 
 // 分片上传大文件
-async function uploadLargeFile(folderName, filePath, file, progressCallback) {
+async function uploadLargeFile(folderName, filePath, file, uploadToken, progressCallback) {
     const CHUNK_SIZE = 50 * 1024 * 1024; // 50MB 每片
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     
@@ -1282,7 +1282,7 @@ async function uploadLargeFile(folderName, filePath, file, progressCallback) {
                 'Authorization': `Bearer ${adminToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ folderName, filePath })
+            body: JSON.stringify({ folderName, filePath, uploadToken })
         });
         
         if (!initResponse.ok) {
@@ -1311,6 +1311,7 @@ async function uploadLargeFile(folderName, filePath, file, progressCallback) {
             formData.append('uploadId', uploadId);
             formData.append('partNumber', partNumber);
             formData.append('chunk', chunk);
+            formData.append('uploadToken', uploadToken);
             
             const partResponse = await fetch('/api/upload/multipart/part', {
                 method: 'POST',
@@ -1338,7 +1339,7 @@ async function uploadLargeFile(folderName, filePath, file, progressCallback) {
                 'Authorization': `Bearer ${adminToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ key, uploadId, parts })
+            body: JSON.stringify({ key, uploadId, parts, uploadToken })
         });
         
         if (!completeResponse.ok) {
@@ -1475,7 +1476,7 @@ async function handleQuickUpload(e) {
             throw new Error('准备上传失败');
         }
 
-        const { folderName } = await prepareResponse.json();
+        const { folderName, uploadToken } = await prepareResponse.json();
 
         // 2. 上传文件（带容错机制）
         let uploadedCount = 0;
@@ -1492,7 +1493,7 @@ async function handleQuickUpload(e) {
                 if (file.size > maxFileSize) {
                     // 使用分片上传
                     console.log(`[快速上传] 大文件，使用分片上传: ${relativePath}`);
-                    await uploadLargeFile(folderName, relativePath, file, (current, total) => {
+                    await uploadLargeFile(folderName, relativePath, file, uploadToken, (current, total) => {
                         quickUploadBtn.textContent = `⏳ 上传中 (${uploadedCount}/${files.length}) - 分片 ${current}/${total}`;
                     });
                 } else {
@@ -1501,6 +1502,7 @@ async function handleQuickUpload(e) {
                     formData.append('folderName', folderName);
                     formData.append('filePath', relativePath);
                     formData.append('file', file);
+                    formData.append('uploadToken', uploadToken);
 
                     const uploadResponse = await fetch('/api/upload/file', {
                         method: 'POST',
@@ -1552,7 +1554,8 @@ async function handleQuickUpload(e) {
                 title: gameName,
                 description: '',
                 entryFile,
-                fileSize: totalSize
+                fileSize: totalSize,
+                uploadToken
             })
         });
 
@@ -1803,7 +1806,7 @@ async function handleUpload(e) {
                 if (file.size > maxFileSize) {
                     // 使用分片上传
                     console.log(`[详细上传] 大文件，使用分片上传: ${path}`);
-                    await uploadLargeFile(folderName, path, file, (current, total) => {
+                    await uploadLargeFile(folderName, path, file, uploadToken, (current, total) => {
                         submitBtn.textContent = `上传中... ${progress}% (${i + 1}/${filesToUpload.length}) - 分片 ${current}/${total}`;
                     });
                 } else {
@@ -1812,6 +1815,7 @@ async function handleUpload(e) {
                     fileFormData.append('folderName', folderName);
                     fileFormData.append('filePath', path);
                     fileFormData.append('file', file);
+                    fileFormData.append('uploadToken', uploadToken);
 
                     const uploadResponse = await fetch('/api/upload/file', {
                         method: 'POST',
@@ -1860,6 +1864,7 @@ async function handleUpload(e) {
             thumbFormData.append('folderName', folderName);
             thumbFormData.append('filePath', 'thumbnail.jpg');
             thumbFormData.append('file', thumbnail);
+            thumbFormData.append('uploadToken', uploadToken);
 
             const thumbResponse = await fetch('/api/upload/file', {
                 method: 'POST',
@@ -1888,6 +1893,7 @@ async function handleUpload(e) {
             saveFormData.append('folderName', folderName);
             saveFormData.append('filePath', 'save.sol');
             saveFormData.append('file', saveFile);
+            saveFormData.append('uploadToken', uploadToken);
 
             const saveResponse = await fetch('/api/upload/file', {
                 method: 'POST',
@@ -1929,7 +1935,8 @@ async function handleUpload(e) {
                 entryFile: entryFileInput.value,
                 fileSize: totalSize,
                 thumbnailKey,
-                tags
+                tags,
+                uploadToken
             })
         });
 
@@ -2194,6 +2201,7 @@ async function editGame(gameId) {
         const game = await response.json();
 
         document.getElementById('editGameId').value = game.id;
+        document.getElementById('editFolderName').value = game.folder_name || '';
         document.getElementById('editGameTitle').value = game.title;
         document.getElementById('editGameTitle2').value = game.title2 || '';
         document.getElementById('editGameTitle3').value = game.title3 || '';
@@ -2351,6 +2359,8 @@ async function handleEdit(e) {
         
         // 如果有文件要上传，使用分步上传
         let newFolderName = null;
+        let editUploadToken = null;
+        let editUploadFolder = null;
         if (filesToUpload.length > 0) {
             submitBtn.textContent = i18n.t('upload.preparing');
             
@@ -2368,8 +2378,10 @@ async function handleEdit(e) {
                 throw new Error('准备上传失败');
             }
 
-            const { folderName } = await prepareResponse.json();
+            const { folderName, uploadToken } = await prepareResponse.json();
             newFolderName = folderName;
+            editUploadToken = uploadToken;
+            editUploadFolder = folderName;
             
             // 2. 逐个上传文件（带分片上传支持）
             let uploadedCount = 0;
@@ -2386,7 +2398,7 @@ async function handleEdit(e) {
                     if (file.size > maxFileSize) {
                         // 使用分片上传
                         console.log(`[编辑游戏] 大文件，使用分片上传: ${path}`);
-                        await uploadLargeFile(folderName, path, file, (current, total) => {
+                        await uploadLargeFile(folderName, path, file, uploadToken, (current, total) => {
                             submitBtn.textContent = `上传中... ${progress}% (${i + 1}/${filesToUpload.length}) - 分片 ${current}/${total}`;
                         });
                     } else {
@@ -2395,6 +2407,7 @@ async function handleEdit(e) {
                         fileFormData.append('folderName', folderName);
                         fileFormData.append('filePath', path);
                         fileFormData.append('file', file);
+                        fileFormData.append('uploadToken', uploadToken);
 
                         const uploadResponse = await fetch('/api/upload/file', {
                             method: 'POST',
@@ -2446,16 +2459,46 @@ async function handleEdit(e) {
         
         // 3. 上传缩略图（如果有）
         const thumbnail = document.getElementById('editThumbnailFile').files[0];
+        const saveFile = document.getElementById('editSaveFile').files[0];
         let thumbnailKey = null;
+        let saveFileKey = null;
+
+        // 如果没有替换游戏文件、只替换缩略图/存档，需要为现有文件夹单独申请上传令牌
+        if ((thumbnail || saveFile) && !editUploadToken) {
+            const existingFolder = document.getElementById('editFolderName')?.value || '';
+            if (!existingFolder) {
+                throw new Error('无法确定游戏文件夹，请重新打开编辑窗口');
+            }
+
+            submitBtn.textContent = i18n.t('upload.preparing');
+            const attachPrepareResponse = await fetch('/api/upload/prepare', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${adminToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fileCount: 1, folderName: existingFolder })
+            });
+
+            if (!attachPrepareResponse.ok) {
+                throw new Error('准备上传失败');
+            }
+
+            const attachPrepare = await attachPrepareResponse.json();
+            editUploadToken = attachPrepare.uploadToken;
+            editUploadFolder = attachPrepare.folderName;
+        }
+
         if (thumbnail) {
             submitBtn.textContent = i18n.t('upload.uploadingThumbnail');
             
-            const folderForThumb = newFolderName || (await fetch(`/api/games/${gameId}`).then(r => r.json())).folder_name;
+            const folderForThumb = newFolderName || editUploadFolder;
             
             const thumbFormData = new FormData();
             thumbFormData.append('folderName', folderForThumb);
             thumbFormData.append('filePath', 'thumbnail.jpg');
             thumbFormData.append('file', thumbnail);
+            thumbFormData.append('uploadToken', editUploadToken);
 
             const thumbResponse = await fetch('/api/upload/file', {
                 method: 'POST',
@@ -2472,17 +2515,16 @@ async function handleEdit(e) {
         }
         
         // 4. 上传存档文件（如果有）
-        const saveFile = document.getElementById('editSaveFile').files[0];
-        let saveFileKey = null;
         if (saveFile) {
             submitBtn.textContent = i18n.t('upload.uploadingSave');
             
-            const folderForSave = newFolderName || (await fetch(`/api/games/${gameId}`).then(r => r.json())).folder_name;
+            const folderForSave = newFolderName || editUploadFolder;
             
             const saveFormData = new FormData();
             saveFormData.append('folderName', folderForSave);
             saveFormData.append('filePath', 'save.sol');
             saveFormData.append('file', saveFile);
+            saveFormData.append('uploadToken', editUploadToken);
 
             const saveResponse = await fetch('/api/upload/file', {
                 method: 'POST',

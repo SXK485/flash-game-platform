@@ -368,8 +368,16 @@ async function handleAPI(request, env, path, corsHeaders) {
     const body = await request.json();
     const { username, password } = body;
 
-    if (!password) {
+    if (typeof password !== 'string' || !password) {
       return jsonResponse({ error: '密码不能为空' }, 400, corsHeaders);
+    }
+
+    if (typeof username !== 'string') {
+      return jsonResponse({ error: '用户名格式无效' }, 400, corsHeaders);
+    }
+
+    if (password.length > 256) {
+      return jsonResponse({ error: '密码长度无效' }, 400, corsHeaders);
     }
 
     // JWT 密钥
@@ -382,13 +390,24 @@ async function handleAPI(request, env, path, corsHeaders) {
       ).bind(username).first();
 
       if (user) {
-        // 用户存在，检查密码
-        if (user.password_hash !== password) {
+        // 用户存在，检查密码（支持 PBKDF2 哈希和旧明文密码）
+        const passwordValid = await verifyPassword(password, user.password_hash);
+        if (!passwordValid) {
           return jsonResponse({ error: '密码错误' }, 401, corsHeaders);
         }
 
         if (user.is_banned) {
           return jsonResponse({ error: '该账号已被封禁' }, 403, corsHeaders);
+        }
+
+        // 旧明文密码验证成功后，自动升级为 PBKDF2 哈希
+        if (needsPasswordRehash(user.password_hash)) {
+          try {
+            const newHash = await hashPassword(password);
+            await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newHash, user.id).run();
+          } catch (error) {
+            console.error('密码哈希升级失败:', error);
+          }
         }
 
         // 更新最后登录时间
@@ -676,7 +695,7 @@ async function handleAPI(request, env, path, corsHeaders) {
     const body = await request.json();
     const { username, password, role = 'admin' } = body;
 
-    if (!username || !password) {
+    if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
       return jsonResponse({ error: '用户名和密码不能为空' }, 400, corsHeaders);
     }
 
@@ -684,8 +703,8 @@ async function handleAPI(request, env, path, corsHeaders) {
       return jsonResponse({ error: '用户名长度必须在3-20个字符之间' }, 400, corsHeaders);
     }
 
-    if (password.length < 6) {
-      return jsonResponse({ error: '密码长度至少6个字符' }, 400, corsHeaders);
+    if (password.length < 6 || password.length > 256) {
+      return jsonResponse({ error: '密码长度必须在6-256个字符之间' }, 400, corsHeaders);
     }
 
     if (role !== 'admin' && role !== 'super_admin') {
@@ -698,10 +717,11 @@ async function handleAPI(request, env, path, corsHeaders) {
       return jsonResponse({ error: '用户名已存在' }, 400, corsHeaders);
     }
 
-    // 创建管理员
+    // 创建管理员（密码使用 PBKDF2-SHA256 哈希后存储）
+    const passwordHash = await hashPassword(password);
     const result = await env.DB.prepare(
       'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)'
-    ).bind(username, password, role).run();
+    ).bind(username, passwordHash, role).run();
 
     return jsonResponse({ 
       id: result.meta.last_row_id,
@@ -1058,8 +1078,16 @@ async function handleAPI(request, env, path, corsHeaders) {
       return jsonResponse({ error: '文件数量无效' }, 400, corsHeaders);
     }
 
-    const folderName = `game_${Date.now()}`;
-    const uploadToken = crypto.randomUUID();
+    // 编辑游戏时可能需要对现有文件夹继续上传（例如只替换缩略图/存档），
+    // 因此允许前端指定 folderName；未指定时生成新文件夹。
+    const requestedFolderName = typeof body.folderName === 'string' && body.folderName.trim() ? body.folderName.trim() : '';
+    if (requestedFolderName && !/^[A-Za-z0-9._-]+$/.test(requestedFolderName)) {
+      return jsonResponse({ error: '文件夹名格式无效' }, 400, corsHeaders);
+    }
+
+    const folderName = requestedFolderName || `game_${Date.now()}`;
+    // 签名令牌：绑定 folderName，2 小时过期，上传接口会校验
+    const uploadToken = await generateUploadToken(folderName, env, 2 * 60 * 60);
 
     return jsonResponse({ 
       folderName,
@@ -1077,9 +1105,14 @@ async function handleAPI(request, env, path, corsHeaders) {
     const folderName = formData.get('folderName');
     const filePath = formData.get('filePath');
     const file = formData.get('file');
+    const uploadToken = formData.get('uploadToken');
 
     if (!folderName || !filePath || !file) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    if (!uploadToken || !await verifyUploadToken(uploadToken, folderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     const key = `${folderName}/${filePath}`;
@@ -1109,10 +1142,14 @@ async function handleAPI(request, env, path, corsHeaders) {
     }
 
     const body = await request.json();
-    const { folderName, filePath } = body;
+    const { folderName, filePath, uploadToken } = body;
 
     if (!folderName || !filePath) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    if (!uploadToken || !await verifyUploadToken(uploadToken, folderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     const key = `${folderName}/${filePath}`;
@@ -1135,9 +1172,15 @@ async function handleAPI(request, env, path, corsHeaders) {
     const uploadId = formData.get('uploadId');
     const partNumber = parseInt(formData.get('partNumber'));
     const chunk = formData.get('chunk');
+    const uploadToken = formData.get('uploadToken');
 
     if (!key || !uploadId || !partNumber || !chunk) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    const partFolderName = key.split('/')[0];
+    if (!uploadToken || !await verifyUploadToken(uploadToken, partFolderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     const multipartUpload = env.FLASH_STORAGE.resumeMultipartUpload(key, uploadId);
@@ -1156,10 +1199,15 @@ async function handleAPI(request, env, path, corsHeaders) {
     }
 
     const body = await request.json();
-    const { key, uploadId, parts } = body;
+    const { key, uploadId, parts, uploadToken } = body;
 
     if (!key || !uploadId || !parts) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    const completeFolderName = key.split('/')[0];
+    if (!uploadToken || !await verifyUploadToken(uploadToken, completeFolderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     const multipartUpload = env.FLASH_STORAGE.resumeMultipartUpload(key, uploadId);
@@ -1178,10 +1226,15 @@ async function handleAPI(request, env, path, corsHeaders) {
     }
 
     const body = await request.json();
-    const { key, uploadId } = body;
+    const { key, uploadId, uploadToken } = body;
 
     if (!key || !uploadId) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    const abortFolderName = key.split('/')[0];
+    if (!uploadToken || !await verifyUploadToken(uploadToken, abortFolderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     const multipartUpload = env.FLASH_STORAGE.resumeMultipartUpload(key, uploadId);
@@ -1211,11 +1264,16 @@ async function handleAPI(request, env, path, corsHeaders) {
       thumbnailKey,
       saveFileKey,
       saveName,
-      tags
+      tags,
+      uploadToken
     } = body;
 
     if (!folderName || !title || !entryFile) {
       return jsonResponse({ error: '缺少必要字段' }, 400, corsHeaders);
+    }
+
+    if (!uploadToken || !await verifyUploadToken(uploadToken, folderName, env)) {
+      return jsonResponse({ error: '上传令牌无效或已过期，请重新发起上传' }, 401, corsHeaders);
     }
 
     // 保存到数据库
@@ -1501,7 +1559,21 @@ async function handleAPI(request, env, path, corsHeaders) {
   return jsonResponse({ error: '未找到' }, 404, corsHeaders);
 }
 
-// ==================== JWT 工具函数 ====================
+// ==================== JWT / 签名工具函数 ====================
+
+// 用 HMAC-SHA256 对字符串签名，返回 Base64URL 签名
+async function signData(data, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  return base64UrlEncode(signature);
+}
 
 // 生成 JWT Token
 async function generateJWT(payload, secret, expiresIn = 7 * 24 * 60 * 60) {
@@ -1517,28 +1589,62 @@ async function generateJWT(payload, secret, expiresIn = 7 * 24 * 60 * 60) {
     exp: now + expiresIn
   };
 
-  const encoder = new TextEncoder();
   const headerBase64 = base64UrlEncode(JSON.stringify(header));
   const payloadBase64 = base64UrlEncode(JSON.stringify(jwtPayload));
   const data = `${headerBase64}.${payloadBase64}`;
 
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    encoder.encode(data)
-  );
-
-  const signatureBase64 = base64UrlEncode(signature);
+  const signatureBase64 = await signData(data, secret);
   return `${data}.${signatureBase64}`;
 }
+
+// 生成上传令牌（HMAC 签名，绑定 folderName，带过期时间）
+async function generateUploadToken(folderName, env, expiresIn = 2 * 60 * 60) {
+  const secret = env.JWT_SECRET || env.ADMIN_PASSWORD;
+  const payload = {
+    folderName,
+    exp: Math.floor(Date.now() / 1000) + expiresIn
+  };
+  const payloadBase64 = base64UrlEncode(JSON.stringify(payload));
+  const signature = await signData(payloadBase64, secret);
+  return `${payloadBase64}.${signature}`;
+}
+
+// 校验上传令牌：签名有效、未过期、且与目标文件夹一致
+async function verifyUploadToken(token, folderName, env) {
+  if (!token || typeof token !== 'string' || !folderName) {
+    return false;
+  }
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 2) {
+      return false;
+    }
+
+    const [payloadBase64, signatureBase64] = parts;
+    const secret = env.JWT_SECRET || env.ADMIN_PASSWORD;
+    const expectedSignature = await signData(payloadBase64, secret);
+
+    if (signatureBase64 !== expectedSignature) {
+      return false;
+    }
+
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(payloadBase64)));
+    if (payload.folderName !== folderName) {
+      return false;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload.exp || payload.exp < now) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 
 // 验证 JWT Token
 async function verifyJWT(token, secret) {
@@ -1658,17 +1764,112 @@ async function checkAuth(request, env) {
       return { role: 'super_admin', username: 'super_admin', id: 0 };
     }
     
-    // 检查数据库中的用户
+    // 检查数据库中的用户（密码同样走 verifyPassword，兼容哈希和旧明文）
     const user = await env.DB.prepare(
-      'SELECT * FROM users WHERE username = ? AND password_hash = ?'
-    ).bind(username, password).first();
+      'SELECT * FROM users WHERE username = ?'
+    ).bind(username).first();
     
-    if (user && !user.is_banned) {
+    if (user && !user.is_banned && await verifyPassword(password, user.password_hash)) {
       return { role: user.role, username: user.username, id: user.id };
     }
   }
   
   return false;
+}
+
+// ==================== 密码哈希工具函数 ====================
+
+// 迭代次数取 50,000：兼顾 Workers 免费版 CPU 限制（约数毫秒）与安全性；
+// 相比之前的明文存储已经是数量级的提升，后续如需加强可整体提升并保留旧哈希兼容。
+const PBKDF2_ITERATIONS = 50000;
+const PBKDF2_KEY_BITS = 256;
+const PBKDF2_PREFIX = 'pbkdf2-sha256';
+
+// 生成 PBKDF2-SHA256 密码哈希，格式：pbkdf2-sha256$iterations$saltHex$hashHex
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const derived = await derivePasswordBytes(password, salt, PBKDF2_ITERATIONS);
+  return `${PBKDF2_PREFIX}$${PBKDF2_ITERATIONS}$${bytesToHex(salt)}$${bytesToHex(derived)}`;
+}
+
+// 校验密码；旧版本存储的是明文，先按哈希校验，格式不匹配时回退到明文比较
+async function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== 'string') {
+    return false;
+  }
+
+  const parts = stored.split('$');
+  if (parts.length === 4 && parts[0] === PBKDF2_PREFIX) {
+    const iterations = parseInt(parts[1], 10);
+    if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 1000000) {
+      return false;
+    }
+
+    const salt = hexToBytes(parts[2]);
+    const expectedHash = hexToBytes(parts[3]);
+    if (!salt || !expectedHash || expectedHash.length !== PBKDF2_KEY_BITS / 8) {
+      return false;
+    }
+
+    const actualHash = await derivePasswordBytes(password, salt, iterations);
+    return timingSafeEqual(actualHash, expectedHash);
+  }
+
+  // 旧明文密码（兼容期，登录成功后会触发自动升级）
+  return password === stored;
+}
+
+// 旧明文密码是否需要升级为 PBKDF2 哈希
+function needsPasswordRehash(stored) {
+  return !stored || typeof stored !== 'string' || !stored.startsWith(`${PBKDF2_PREFIX}$`);
+}
+
+async function derivePasswordBytes(password, salt, iterations) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: salt,
+      iterations: iterations
+    },
+    key,
+    PBKDF2_KEY_BITS
+  );
+  return new Uint8Array(bits);
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex) {
+  if (typeof hex !== 'string' || hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+    return null;
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
 }
 
 async function checkSuperAdmin(request, env) {
