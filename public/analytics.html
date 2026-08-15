@@ -252,9 +252,60 @@
                 min-height: 44px;
             }
 
-            .game-stats-table,
-            .access-logs-table {
-                min-width: 640px;
+            .table-scroll {
+                overflow: visible;
+            }
+
+            /* 宽表格在手机上改成卡片式布局，不再左右滑动 */
+            .responsive-card-table,
+            .responsive-card-table tbody,
+            .responsive-card-table tr,
+            .responsive-card-table td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .responsive-card-table {
+                min-width: 0;
+            }
+
+            .responsive-card-table thead {
+                display: none;
+            }
+
+            .responsive-card-table tr {
+                background: #f8f9fa;
+                border: 1px solid #eef0f3;
+                border-radius: 12px;
+                padding: 10px 12px;
+                margin-bottom: 10px;
+            }
+
+            .responsive-card-table tr:hover {
+                background: #f3f5f8;
+            }
+
+            .responsive-card-table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                padding: 7px 0;
+                border-bottom: 1px dashed #e5e7eb;
+                text-align: right;
+            }
+
+            .responsive-card-table td:last-child {
+                border-bottom: none;
+            }
+
+            .responsive-card-table td::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: #888;
+                font-size: 12px;
+                text-align: left;
             }
 
             .pagination {
@@ -346,7 +397,7 @@
             </div>
             <div id="gameStatsLoading" class="loading" data-i18n="analytics.loading">加载中...</div>
             <div class="table-scroll">
-                <table class="game-stats-table" id="gameStatsTable" style="display: none;">
+                <table class="game-stats-table responsive-card-table" id="gameStatsTable" style="display: none;">
                     <thead>
                         <tr>
                             <th data-i18n="analytics.gameName">游戏名称</th>
@@ -379,7 +430,7 @@
             </div>
             <div id="accessLogsLoading" class="loading" data-i18n="analytics.loading">加载中...</div>
             <div class="table-scroll">
-                <table class="access-logs-table" id="accessLogsTable" style="display: none;">
+                <table class="access-logs-table responsive-card-table" id="accessLogsTable" style="display: none;">
                     <thead>
                         <tr>
                             <th data-i18n="analytics.time">时间</th>
@@ -523,18 +574,18 @@
                         const conversionRate = game.views > 0 ? ((game.plays / game.views) * 100).toFixed(1) : 0;
                         const row = `
                             <tr>
-                                <td><strong>${escapeHtml(game.title)}</strong></td>
-                                <td>${game.views.toLocaleString()}</td>
-                                <td>${game.plays.toLocaleString()}</td>
-                                <td>${game.downloads.toLocaleString()}</td>
-                                <td>${conversionRate}%</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.gameName'))}"><strong>${escapeHtml(game.title)}</strong></td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.views'))}">${game.views.toLocaleString()}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.plays'))}">${game.plays.toLocaleString()}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.downloads'))}">${game.downloads.toLocaleString()}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.conversionRate'))}">${conversionRate}%</td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
                     });
 
                     document.getElementById('gameStatsLoading').style.display = 'none';
-                    document.getElementById('gameStatsTable').style.display = 'table';
+                    document.getElementById('gameStatsTable').style.display = '';
                 }
             } catch (error) {
                 console.error('加载游戏统计失败:', error);
@@ -573,19 +624,19 @@
                         const actionBadge = `<span class="action-badge ${log.action}">${getActionText(log.action)}</span>`;
                         const row = `
                             <tr>
-                                <td>${formatDateTime(log.created_date)}</td>
-                                <td>${escapeHtml(log.game_title)}</td>
-                                <td>${actionBadge}</td>
-                                <td>${log.user_ip || '-'}</td>
-                                <td>${log.country || '-'}</td>
-                                <td>${getBrowserName(log.user_agent)}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.time'))}">${formatDateTime(log.created_date)}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.game'))}">${escapeHtml(log.game_title)}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.action'))}">${actionBadge}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.ip'))}">${log.user_ip || '-'}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.country'))}">${log.country || '-'}</td>
+                                <td data-label="${escapeHtml(i18n.t('analytics.browser'))}">${getBrowserName(log.user_agent)}</td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
                     });
 
                     document.getElementById('accessLogsLoading').style.display = 'none';
-                    document.getElementById('accessLogsTable').style.display = 'table';
+                    document.getElementById('accessLogsTable').style.display = '';
 
                     // 更新分页
                     updatePagination(data.total, page);

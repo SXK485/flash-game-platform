@@ -1515,6 +1515,33 @@ textarea {
         white-space: nowrap;
     }
 
+    /* 登录后的用户信息：紧凑胶囊，不独占一行 */
+    .current-user-display {
+        order: 6;
+        flex: 0 1 auto;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+        width: auto;
+        padding: 4px 8px 4px 10px;
+        border-radius: 999px;
+        background: rgba(102, 126, 234, 0.1);
+    }
+
+    .current-user-display .user-role,
+    .current-user-display .user-name {
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .current-user-display .btn-logout {
+        width: auto;
+        margin-left: 2px;
+        padding: 4px 8px;
+        font-size: 12px;
+        min-height: 0;
+    }
+
     /* ---------- 热门标签：可换行，不横向隐藏 ---------- */
     .hot-tags {
         margin: 0 10px 12px;
