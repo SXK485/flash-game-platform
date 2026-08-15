@@ -808,6 +808,7 @@ function showAdminMenu() {
             <button onclick="showAdminManagement(); closeAdminMenu()">👥 ${i18n.t('admin.manageAdmins')}</button>
             <button onclick="showSiteSettings(); closeAdminMenu()">⚙️ ${i18n.t('admin.siteSettings')}</button>
             <button onclick="showTagManager(); closeAdminMenu()">🏷️ ${i18n.t('tag.manager.title')}</button>
+            <button onclick="showGameOrderManager(); closeAdminMenu()">🔢 ${i18n.t('order.managerTitle')}</button>
             <button onclick="logout()">🚪 ${i18n.t('nav.logout')}</button>
         </div>
     `;
@@ -1344,6 +1345,119 @@ async function saveTagInfo(tagId) {
     } catch (error) {
         console.error('保存标签失败:', error);
         alert(i18n.t('tag.manager.saveFailed'));
+    }
+}
+
+// ==================== 游戏排序管理 ====================
+async function showGameOrderManager() {
+    try {
+        const response = await fetch('/api/games', { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const games = await response.json();
+        const sorted = [...games].sort((a, b) => {
+            const ao = Number(a.sort_order) || 0;
+            const bo = Number(b.sort_order) || 0;
+            if (ao === 0 && bo === 0) {
+                return new Date(b.upload_date) - new Date(a.upload_date);
+            }
+            if (ao === 0) return 1;
+            if (bo === 0) return -1;
+            return ao - bo;
+        });
+
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'gameOrderManagerModal';
+        modal.innerHTML = `
+            <div class="modal-content order-manager-content">
+                <span class="close" onclick="closeGameOrderManager()">&times;</span>
+                <h2>🔢 ${i18n.t('order.managerTitle')}</h2>
+                <p class="order-manager-hint">${i18n.t('order.managerHint')}</p>
+                <div class="order-manager-list">
+                    ${sorted.map((game, index) => `
+                        <div class="order-manager-item" data-game-id="${game.id}">
+                            <span class="order-manager-title">${escapeHtml(game.title)}</span>
+                            <input type="number" class="order-manager-input" data-order-id="${game.id}"
+                                   min="0" step="1" value="${Number(game.sort_order) || ''}"
+                                   placeholder="${index + 1}" inputmode="numeric">
+                            <button type="button" class="btn-secondary order-top-btn" onclick="moveGameOrderToTop(${game.id})">${i18n.t('order.toTop')}</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="order-manager-actions">
+                    <button type="button" class="btn-primary" onclick="saveGameOrder()">${i18n.t('app.save')}</button>
+                    <button type="button" class="btn-secondary" onclick="closeGameOrderManager()">${i18n.t('app.cancel')}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('加载游戏排序失败:', error);
+        alert(i18n.t('order.loadFailed'));
+    }
+}
+
+function closeGameOrderManager() {
+    const modal = document.getElementById('gameOrderManagerModal');
+    if (modal) modal.remove();
+}
+
+function moveGameOrderToTop(gameId) {
+    const rows = Array.from(document.querySelectorAll('#gameOrderManagerModal .order-manager-item'));
+    const target = rows.find(row => Number(row.dataset.gameId) === Number(gameId));
+    if (!target) return;
+
+    const targetInput = target.querySelector('[data-order-id]');
+    const oldValue = parseInt(targetInput.value, 10) || Number.MAX_SAFE_INTEGER;
+
+    for (const row of rows) {
+        if (Number(row.dataset.gameId) === Number(gameId)) continue;
+        const input = row.querySelector('[data-order-id]');
+        const value = parseInt(input.value, 10);
+        if (Number.isInteger(value) && value > 0 && value < oldValue) {
+            input.value = value + 1;
+        }
+    }
+
+    targetInput.value = 1;
+}
+
+async function saveGameOrder() {
+    const rows = Array.from(document.querySelectorAll('#gameOrderManagerModal .order-manager-item'));
+    const orders = rows.map(row => {
+        const input = row.querySelector('[data-order-id]');
+        return {
+            id: Number(row.dataset.gameId),
+            sortOrder: parseInt(input.value, 10) || 0
+        };
+    });
+
+    try {
+        const response = await fetch('/api/games/reorder', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ orders })
+        });
+
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+
+        alert(i18n.t('order.saveSuccess'));
+        closeGameOrderManager();
+
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) {
+            sortSelect.value = 'manual';
+        }
+        loadGames();
+    } catch (error) {
+        console.error('保存排序失败:', error);
+        alert(i18n.t('order.saveFailed'));
     }
 }
 
@@ -2417,6 +2531,19 @@ function sortGames(games, sortBy) {
     const sorted = [...games];
     
     switch (sortBy) {
+        case 'manual':
+            // 管理员手动排序；未设置序号的排在有序号之后，按上传时间
+            sorted.sort((a, b) => {
+                const ao = Number(a.sort_order) || 0;
+                const bo = Number(b.sort_order) || 0;
+                if (ao === 0 && bo === 0) {
+                    return new Date(b.upload_date) - new Date(a.upload_date);
+                }
+                if (ao === 0) return 1;
+                if (bo === 0) return -1;
+                return ao - bo;
+            });
+            break;
         case 'date_desc':
             // 最新上传（默认，已经是这个顺序）
             sorted.sort((a, b) => new Date(b.upload_date) - new Date(a.upload_date));

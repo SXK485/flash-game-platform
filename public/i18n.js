@@ -49,6 +49,7 @@ const translations = {
         'games.sort.earliest': '最早上传',
         'games.sort.popular': '最多播放',
         'games.sort.name': '按名称',
+        'games.sort.manual': '默认排序',
         'games.play': '开始游戏',
         'games.plays': '次播放',
         'games.noGames': '暂无游戏',
@@ -274,6 +275,12 @@ const translations = {
         'tag.manager.type': '类型',
         'tag.manager.description': '描述',
         'tag.manager.descriptionPlaceholder': '标签说明（可选）',
+        'order.managerTitle': '游戏排序',
+        'order.managerHint': '输入序号控制首页默认顺序；留空或 0 表示未排序，会排在已排序游戏之后。',
+        'order.toTop': '置顶',
+        'order.loadFailed': '加载排序列表失败',
+        'order.saveSuccess': '排序保存成功！',
+        'order.saveFailed': '排序保存失败',
         
         // 编辑游戏
         'edit.title': '编辑游戏',
@@ -399,6 +406,7 @@ const translations = {
         'games.sort.earliest': 'Earliest',
         'games.sort.popular': 'Most Played',
         'games.sort.name': 'By Name',
+        'games.sort.manual': 'Default Order',
         'games.play': 'Play',
         'games.plays': 'plays',
         'games.noGames': 'No games available',
@@ -624,6 +632,12 @@ const translations = {
         'tag.manager.type': 'Type',
         'tag.manager.description': 'Description',
         'tag.manager.descriptionPlaceholder': 'Tag description (optional)',
+        'order.managerTitle': 'Game Order',
+        'order.managerHint': 'Enter numbers to control the default homepage order; leave empty or 0 for unordered games, which appear after ordered ones.',
+        'order.toTop': 'To Top',
+        'order.loadFailed': 'Failed to load order list',
+        'order.saveSuccess': 'Order saved!',
+        'order.saveFailed': 'Failed to save order',
         
         // Edit Game
         'edit.title': 'Edit Game',

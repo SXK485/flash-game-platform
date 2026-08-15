@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS games (
     play_count INTEGER DEFAULT 0,
     file_size INTEGER,
     save_file_key TEXT,
-    save_name TEXT DEFAULT 'mu09'
+    save_name TEXT DEFAULT 'mu09',
+    sort_order INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_title ON games(title);

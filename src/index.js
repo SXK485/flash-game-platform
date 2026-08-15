@@ -794,6 +794,39 @@ LEFT JOIN (
     return jsonResponse(results, 200, corsHeaders);
   }
 
+  // 批量保存游戏手动排序（需要管理员权限）
+  if (path === '/api/games/reorder' && method === 'POST') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const body = await request.json();
+    const orders = body && Array.isArray(body.orders) ? body.orders : [];
+
+    if (orders.length === 0 || orders.length > 1000) {
+      return jsonResponse({ error: '排序数据无效' }, 400, corsHeaders);
+    }
+
+    for (const item of orders) {
+      const gameId = parseInt(item.id, 10);
+      const sortOrder = parseInt(item.sortOrder, 10);
+      if (!Number.isInteger(gameId) || gameId <= 0) {
+        return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+      }
+      if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1000000) {
+        return jsonResponse({ error: '排序序号无效' }, 400, corsHeaders);
+      }
+    }
+
+    for (const item of orders) {
+      await env.DB.prepare('UPDATE games SET sort_order = ? WHERE id = ?')
+        .bind(parseInt(item.sortOrder, 10), parseInt(item.id, 10))
+        .run();
+    }
+
+    return jsonResponse({ message: '排序保存成功' }, 200, corsHeaders);
+  }
+
   // 获取单个游戏详情
   if (path.match(/^\/api\/games\/\d+$/) && method === 'GET') {
     const id = path.split('/').pop();
