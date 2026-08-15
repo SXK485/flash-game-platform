@@ -95,6 +95,13 @@
 
     <main class="container">
         <div id="hotTags" class="hot-tags"></div>
+        <div id="recentGamesSection" class="recent-games-section" style="display: none;">
+            <div class="recent-games-header">
+                <h2 data-i18n="history.title">最近游玩</h2>
+                <button type="button" class="recent-clear-btn" onclick="clearPlayHistory()" data-i18n="history.clear">清空</button>
+            </div>
+            <div id="recentGamesList" class="recent-games-list"></div>
+        </div>
         <div id="gameGrid" class="game-grid"></div>
         <div id="emptyState" class="empty-state" style="display: none;">
             <p data-i18n="games.emptyState">暂无游戏，管理员可以上传游戏</p>

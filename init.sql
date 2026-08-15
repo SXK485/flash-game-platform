@@ -112,6 +112,22 @@ CREATE INDEX IF NOT EXISTS idx_favorites_device ON favorites(device_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_game ON favorites(game_id);
 
 -- ============================================
+-- 4.6 最近游玩记录（匿名设备 ID）
+-- ============================================
+CREATE TABLE IF NOT EXISTS play_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    game_id INTEGER NOT NULL,
+    last_played DATETIME DEFAULT CURRENT_TIMESTAMP,
+    play_count INTEGER DEFAULT 1,
+    UNIQUE(device_id, game_id),
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_play_history_device ON play_history(device_id, last_played DESC);
+CREATE INDEX IF NOT EXISTS idx_play_history_game ON play_history(game_id);
+
+-- ============================================
 -- 5. 监控系统
 -- ============================================
 CREATE TABLE IF NOT EXISTS access_logs (

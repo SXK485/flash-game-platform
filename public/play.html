@@ -100,11 +100,46 @@
             loadGame(gameId);
         }
 
+        // 获取匿名设备 ID（与首页收藏/最近游玩使用同一个 key）
+        function getVisitorDeviceId() {
+            let deviceId = localStorage.getItem('flashVisitorId');
+            if (!deviceId) {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    deviceId = window.crypto.randomUUID();
+                } else {
+                    deviceId = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+                }
+                localStorage.setItem('flashVisitorId', deviceId);
+            }
+            return deviceId;
+        }
+
+        // 记录最近游玩
+        async function recordPlayHistory(gameId) {
+            try {
+                await fetch('/api/play-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        deviceId: getVisitorDeviceId(),
+                        gameId: gameId
+                    })
+                });
+            } catch (error) {
+                console.error('记录最近游玩失败:', error);
+            }
+        }
+
         async function loadGame(id) {
             try {
                 const response = await fetch(`/api/games/${id}`);
                 const game = await response.json();
                 currentGame = game;
+
+                // 记录最近游玩（失败不影响播放）
+                recordPlayHistory(game.id);
 
                 // 如果有存档文件，先加载存档再启动游戏
                 if (game.save_file_key && game.save_name) {

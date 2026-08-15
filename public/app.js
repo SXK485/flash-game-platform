@@ -9,6 +9,7 @@ let allTags = []; // 所有可用的 tags
 let favoriteGameIds = new Set(); // 当前设备的收藏游戏 ID
 let showFavoritesOnly = false; // 首页是否只看收藏
 let visitorDeviceId = null;
+let recentPlayedGames = []; // 当前设备最近游玩
 
 // 获取匿名设备 ID（游客免登录收藏用，存在 localStorage）
 function getVisitorDeviceId() {
@@ -43,6 +44,70 @@ async function loadFavorites() {
         favoriteGameIds = new Set(ids.map(id => Number(id)));
     } catch (error) {
         console.error('加载收藏失败:', error);
+    }
+}
+
+// 加载当前设备最近游玩记录
+async function loadPlayHistory() {
+    if (!recentGamesSection || !recentGamesList) {
+        return;
+    }
+
+    try {
+        const deviceId = getVisitorDeviceId();
+        const response = await fetch(`/api/play-history?deviceId=${encodeURIComponent(deviceId)}&limit=12`);
+        if (!response.ok) {
+            return;
+        }
+
+        recentPlayedGames = await response.json();
+        renderRecentGames();
+    } catch (error) {
+        console.error('加载最近游玩失败:', error);
+    }
+}
+
+// 渲染最近游玩区域
+function renderRecentGames() {
+    if (!recentGamesSection || !recentGamesList) {
+        return;
+    }
+
+    if (recentPlayedGames.length === 0) {
+        recentGamesSection.style.display = 'none';
+        return;
+    }
+
+    recentGamesSection.style.display = 'block';
+    recentGamesList.innerHTML = recentPlayedGames.map(game => `
+        <div class="recent-game-card" onclick="window.location.href='/play.html?id=${game.id}'">
+            ${game.thumbnail_url
+                ? `<img src="${escapeHtml(game.thumbnail_url)}" alt="${escapeHtml(game.title)}">`
+                : '<div class="recent-game-thumbnail-placeholder">🎮</div>'
+            }
+            <div class="recent-game-title">${escapeHtml(game.title)}</div>
+        </div>
+    `).join('');
+}
+
+// 清空最近游玩记录
+async function clearPlayHistory() {
+    if (!confirm(i18n.t('history.clearConfirm'))) {
+        return;
+    }
+
+    try {
+        const deviceId = getVisitorDeviceId();
+        const response = await fetch(`/api/play-history?deviceId=${encodeURIComponent(deviceId)}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            recentPlayedGames = [];
+            renderRecentGames();
+        }
+    } catch (error) {
+        console.error('清空最近游玩失败:', error);
     }
 }
 
@@ -113,6 +178,8 @@ const emptyState = document.getElementById('emptyState');
 const searchInput = document.getElementById('searchInput');
 const hotTags = document.getElementById('hotTags');
 const favoritesFilterBtn = document.getElementById('favoritesFilterBtn');
+const recentGamesSection = document.getElementById('recentGamesSection');
+const recentGamesList = document.getElementById('recentGamesList');
 const adminBtn = document.getElementById('adminBtn');
 const loginModal = document.getElementById('loginModal');
 const uploadModal = document.getElementById('uploadModal');
@@ -138,10 +205,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTags();
     setupEventListeners();
     
-    // 先检查登录状态，再加载收藏和游戏
+    // 先检查登录状态，再加载收藏、最近游玩和游戏
     checkAdminStatus().then(async () => {
-        console.log('[DEBUG] 初始化：登录状态检查完成，开始加载收藏和游戏');
-        await loadFavorites();
+        console.log('[DEBUG] 初始化：登录状态检查完成，开始加载收藏、最近游玩和游戏');
+        await Promise.all([loadFavorites(), loadPlayHistory()]);
         loadGames();
         
         // 检查是否有编辑参数
@@ -166,7 +233,7 @@ window.addEventListener('pageshow', (event) => {
         console.log('[DEBUG] 检测到浏览器返回，重新检查登录状态并渲染');
         checkAdminStatus().then(async () => {
             console.log('[DEBUG] 登录状态检查完成，重新渲染游戏列表');
-            await loadFavorites();
+            await Promise.all([loadFavorites(), loadPlayHistory()]);
             performSearch(searchInput.value);
         });
     }
@@ -182,7 +249,7 @@ document.addEventListener('visibilitychange', () => {
         if (now - lastRender > 1000) { // 超过1秒，可能是从其他页面返回
             console.log('[DEBUG] 可能从其他页面返回，重新渲染');
             checkAdminStatus().then(async () => {
-                await loadFavorites();
+                await Promise.all([loadFavorites(), loadPlayHistory()]);
                 performSearch(searchInput.value);
             });
         }

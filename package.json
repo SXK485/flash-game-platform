@@ -8,6 +8,6 @@
     "db:init": "wrangler d1 execute flash_games_db --file=./init.sql --remote"
   },
   "devDependencies": {
-    "wrangler": "^3.114.17"
+    "wrangler": "^4.123.0"
   }
 }

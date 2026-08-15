@@ -338,6 +338,78 @@ async function handleAPI(request, env, path, corsHeaders) {
     }, 200, corsHeaders);
   }
 
+  // 记录最近游玩（匿名设备 ID，无需登录）
+  if (path === '/api/play-history' && method === 'POST') {
+    const body = await request.json();
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const gameId = parseInt(body.gameId, 10);
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+    }
+
+    const game = await env.DB.prepare('SELECT id FROM games WHERE id = ?').bind(gameId).first();
+    if (!game) {
+      return jsonResponse({ error: '游戏不存在' }, 404, corsHeaders);
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO play_history (device_id, game_id, last_played, play_count)
+      VALUES (?, ?, CURRENT_TIMESTAMP, 1)
+      ON CONFLICT(device_id, game_id) DO UPDATE SET
+        last_played = CURRENT_TIMESTAMP,
+        play_count = play_count + 1
+    `).bind(deviceId, gameId).run();
+
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  }
+
+  // 获取最近游玩列表（匿名设备 ID）
+  if (path === '/api/play-history' && method === 'GET') {
+    const url = new URL(request.url);
+    const deviceId = (url.searchParams.get('deviceId') || '').trim();
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10', 10), 1), 20);
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    const { results } = await env.DB.prepare(`
+      SELECT
+        h.game_id as id,
+        h.last_played,
+        h.play_count,
+        g.title,
+        g.thumbnail_url,
+        g.folder_name,
+        g.swf_filename
+      FROM play_history h
+      INNER JOIN games g ON g.id = h.game_id
+      WHERE h.device_id = ?
+      ORDER BY h.last_played DESC, h.id DESC
+      LIMIT ?
+    `).bind(deviceId, limit).all();
+
+    return jsonResponse(results, 200, corsHeaders);
+  }
+
+  // 清空最近游玩记录（匿名设备 ID）
+  if (path === '/api/play-history' && method === 'DELETE') {
+    const url = new URL(request.url);
+    const deviceId = (url.searchParams.get('deviceId') || '').trim();
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    await env.DB.prepare('DELETE FROM play_history WHERE device_id = ?').bind(deviceId).run();
+    return jsonResponse({ success: true }, 200, corsHeaders);
+  }
+
   // 获取游戏列表
   if (path === '/api/games' && method === 'GET') {
     const url = new URL(request.url);
@@ -1648,6 +1720,9 @@ async function handleAPI(request, env, path, corsHeaders) {
 
     // 清理收藏关系（D1 可能未开启外键级联，这里显式删除）
     await env.DB.prepare('DELETE FROM favorites WHERE game_id = ?').bind(id).run();
+
+    // 清理最近游玩记录
+    await env.DB.prepare('DELETE FROM play_history WHERE game_id = ?').bind(id).run();
 
     // 从数据库删除
     await env.DB.prepare('DELETE FROM games WHERE id = ?').bind(id).run();
