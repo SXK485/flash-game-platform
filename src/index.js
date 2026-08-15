@@ -43,7 +43,7 @@ export default {
   }
 };
 
-// 动态生成 sitemap.xml：首页 + 所有游戏详情页
+// 动态生成 sitemap.xml：首页 + 所有游戏详情页（含封面图片条目）
 async function handleSitemap(request, env) {
   try {
     const url = new URL(request.url);
@@ -51,14 +51,20 @@ async function handleSitemap(request, env) {
     const today = getShanghaiDateString();
 
     const { results: games } = await env.DB.prepare(
-      'SELECT id, upload_date FROM games ORDER BY upload_date DESC'
+      'SELECT id, title, thumbnail_url, upload_date FROM games ORDER BY upload_date DESC'
     ).all();
 
     const toDateOnly = (value) => String(value || '').replace('T', ' ').split(' ')[0];
+    const escapeXml = (value) => String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
 
     const urls = [
       `<url>
-    <loc>${baseUrl}/</loc>
+    <loc>${escapeXml(`${baseUrl}/`)}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -67,16 +73,33 @@ async function handleSitemap(request, env) {
 
     for (const game of games) {
       const lastmod = toDateOnly(game.upload_date) || today;
+      const pageUrl = `${baseUrl}/game.html?id=${game.id}`;
+
+      const rawImageUrl = game.thumbnail_url && game.thumbnail_url.startsWith('http')
+        ? game.thumbnail_url
+        : game.thumbnail_url && game.thumbnail_url.startsWith('/')
+          ? `${baseUrl}${game.thumbnail_url}`
+          : '';
+
+      const imageBlock = rawImageUrl
+        ? `
+    <image:image>
+      <image:loc>${escapeXml(rawImageUrl)}</image:loc>
+      <image:title>${escapeXml(game.title)}</image:title>
+    </image:image>`
+        : '';
+
       urls.push(`  <url>
-    <loc>${baseUrl}/game.html?id=${game.id}</loc>
+    <loc>${escapeXml(pageUrl)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.8</priority>${imageBlock}
   </url>`);
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls.join('\n')}
 </urlset>`;
 
