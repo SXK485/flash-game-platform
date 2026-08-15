@@ -585,6 +585,31 @@ async function handleAPI(request, env, path, corsHeaders) {
     }, 200, corsHeaders);
   }
 
+  // 获取某游戏评分分布（仅管理员）
+  if (path === '/api/ratings/distribution' && method === 'GET') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const url = new URL(request.url);
+    const gameId = parseInt(url.searchParams.get('gameId'), 10);
+
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return jsonResponse({ error: '游戏 ID 无效' }, 400, corsHeaders);
+    }
+
+    const { results } = await env.DB.prepare(
+      'SELECT rating, COUNT(*) as count FROM ratings WHERE game_id = ? GROUP BY rating'
+    ).bind(gameId).all();
+
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const row of results) {
+      distribution[row.rating] = row.count;
+    }
+
+    return jsonResponse(distribution, 200, corsHeaders);
+  }
+
   // 提交或修改评分（玩过该游戏的匿名设备才能评）
   if (path === '/api/ratings' && method === 'POST') {
     const body = await request.json();

@@ -1281,6 +1281,67 @@ textarea {
     color: #999;
 }
 
+/* 管理员评分分布 */
+.rating-distribution-wrap {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.rating-distribution-toggle {
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #667eea;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    min-height: 32px;
+}
+
+.rating-distribution {
+    width: 100%;
+    max-width: 340px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.rating-dist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rating-dist-label {
+    flex: 0 0 32px;
+    font-size: 12px;
+    color: #666;
+    text-align: right;
+}
+
+.rating-dist-bar {
+    flex: 1 1 auto;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.rating-dist-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    border-radius: 999px;
+    min-width: 2px;
+}
+
+.rating-dist-count {
+    flex: 0 0 34px;
+    font-size: 12px;
+    color: #666;
+    text-align: right;
+}
+
 .game-header-info h1 {
     margin-bottom: 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

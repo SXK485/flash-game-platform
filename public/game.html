@@ -142,6 +142,10 @@
                 currentUserRating = data.rating;
                 currentCanRate = data.canRate;
                 renderRatingWidget(gameId, data.ratingAvg, data.ratingCount);
+
+                if (isAdmin) {
+                    loadRatingDistribution(gameId);
+                }
             } catch (error) {
                 console.error('加载评分失败:', error);
             }
@@ -200,6 +204,47 @@
             }
         }
         
+        // ==================== 管理员评分分布 ====================
+        async function loadRatingDistribution(gameId) {
+            const container = document.getElementById('ratingDistribution');
+            if (!container) return;
+
+            try {
+                const response = await fetch(`/api/ratings/distribution?gameId=${gameId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+                if (!response.ok) return;
+
+                const distribution = await response.json();
+                const total = Object.values(distribution).reduce((sum, value) => sum + Number(value || 0), 0);
+
+                container.innerHTML = [5, 4, 3, 2, 1].map(rating => {
+                    const count = Number(distribution[rating] || 0);
+                    const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+                    return `
+                        <div class="rating-dist-row">
+                            <span class="rating-dist-label">${rating}★</span>
+                            <div class="rating-dist-bar">
+                                <div class="rating-dist-fill" style="width: ${percent}%;"></div>
+                            </div>
+                            <span class="rating-dist-count">${count}</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('加载评分分布失败:', error);
+            }
+        }
+
+        function toggleRatingDistribution() {
+            const container = document.getElementById('ratingDistribution');
+            if (!container) return;
+            const hidden = container.style.display === 'none';
+            container.style.display = hidden ? 'block' : 'none';
+        }
+
         // 检查登录状态
         async function checkLoginStatus() {
             console.log('[DEBUG] 开始检查登录状态, adminToken:', adminToken ? '存在' : '不存在');
@@ -333,6 +378,14 @@
                                 <span class="rating-stars" id="ratingStars"></span>
                                 <span class="rating-info" id="ratingInfo"></span>
                                 <span class="rating-hint" id="ratingHint" style="display: none;"></span>
+                                ${isAdmin ? `
+                                <div class="rating-distribution-wrap">
+                                    <button type="button" class="rating-distribution-toggle" id="ratingDistributionToggle" onclick="toggleRatingDistribution()">
+                                        ${i18n.t('rating.distributionToggle')}
+                                    </button>
+                                    <div class="rating-distribution" id="ratingDistribution" style="display: none;"></div>
+                                </div>
+                                ` : ''}
                             </div>
                             <div style="margin-top: 16px;">
                                 <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #333;">
