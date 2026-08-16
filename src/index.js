@@ -818,10 +818,22 @@ LEFT JOIN (
       }
     }
 
-    for (const item of orders) {
-      await env.DB.prepare('UPDATE games SET sort_order = ? WHERE id = ?')
-        .bind(parseInt(item.sortOrder, 10), parseInt(item.id, 10))
-        .run();
+    // 每批最多 200 款，用一条 CASE WHEN 批量更新，避免逐条 UPDATE 的多次网络往返
+    for (let i = 0; i < orders.length; i += 200) {
+      const chunk = orders.slice(i, i + 200);
+      const caseSql = chunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const placeholders = chunk.map(() => '?').join(',');
+      const params = [];
+      for (const item of chunk) {
+        params.push(parseInt(item.id, 10), parseInt(item.sortOrder, 10));
+      }
+      for (const item of chunk) {
+        params.push(parseInt(item.id, 10));
+      }
+
+      await env.DB.prepare(
+        `UPDATE games SET sort_order = CASE id ${caseSql} ELSE sort_order END WHERE id IN (${placeholders})`
+      ).bind(...params).run();
     }
 
     return jsonResponse({ message: '排序保存成功' }, 200, corsHeaders);

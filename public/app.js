@@ -1425,13 +1425,22 @@ function moveGameOrderToTop(gameId) {
 
 async function saveGameOrder() {
     const rows = Array.from(document.querySelectorAll('#gameOrderManagerModal .order-manager-item'));
-    const orders = rows.map(row => {
+    const items = rows.map((row, index) => {
         const input = row.querySelector('[data-order-id]');
+        const parsed = parseInt(input.value, 10);
         return {
             id: Number(row.dataset.gameId),
-            sortOrder: parseInt(input.value, 10) || 0
+            desired: Number.isInteger(parsed) ? parsed : index + 1,
+            originalIndex: index
         };
     });
+
+    // 按期望位置排序，重复或留空时保持当前相对顺序，然后统一重编号 1..N
+    items.sort((a, b) => a.desired - b.desired || a.originalIndex - b.originalIndex);
+    const orders = items.map((item, index) => ({
+        id: item.id,
+        sortOrder: index + 1
+    }));
 
     try {
         const response = await fetch('/api/games/reorder', {
