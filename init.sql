@@ -160,10 +160,23 @@ CREATE TABLE IF NOT EXISTS wishes (
     link TEXT,
     note TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
+    admin_note TEXT,
+    device_id TEXT,
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_wishes_status ON wishes(status, created_date DESC);
+
+CREATE TABLE IF NOT EXISTS wish_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wish_id INTEGER NOT NULL,
+    device_id TEXT NOT NULL,
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(wish_id, device_id),
+    FOREIGN KEY (wish_id) REFERENCES wishes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wish_votes_wish ON wish_votes(wish_id);
 
 -- ============================================
 -- 5. 监控系统

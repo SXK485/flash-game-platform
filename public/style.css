@@ -231,6 +231,54 @@ h1 {
     cursor: pointer;
 }
 
+.wishlist-banner-actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.wishlist-view-btn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 7px 14px;
+    border: 1px solid #667eea;
+    border-radius: 999px;
+    background: white;
+    color: #667eea;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wish-vote-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.wish-manager-admin-note {
+    font-size: 13px;
+    color: #b45309;
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 8px 0;
+    white-space: pre-wrap;
+}
+
+.wish-manager-admin-note-input {
+    width: 100%;
+    min-height: 64px;
+    margin: 8px 0;
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+}
+
 .wish-manager-content {
     max-width: 720px !important;
 }
@@ -2102,6 +2150,12 @@ textarea {
     .wishlist-banner {
         margin: 0 10px 14px;
         padding: 10px 12px;
+        flex-wrap: wrap;
+    }
+
+    .wishlist-banner-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 
     .recent-games-header h2 {

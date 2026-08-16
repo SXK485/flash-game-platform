@@ -113,7 +113,10 @@
         </div>
         <div id="wishlistBanner" class="wishlist-banner">
             <span data-i18n="wish.banner">没有找到想玩的游戏？</span>
-            <button type="button" id="wishlistOpenBtn" class="wishlist-open-btn" data-i18n="wish.button">提交愿望</button>
+            <div class="wishlist-banner-actions">
+                <button type="button" id="wishlistViewBtn" class="wishlist-view-btn" data-i18n="wish.view">查看愿望单</button>
+                <button type="button" id="wishlistOpenBtn" class="wishlist-open-btn" data-i18n="wish.button">提交愿望</button>
+            </div>
         </div>
         <div id="gameGrid" class="game-grid"></div>
         <div id="emptyState" class="empty-state" style="display: none;">
@@ -306,6 +309,15 @@
                 <textarea id="wishNote" maxlength="2000" data-i18n-placeholder="wish.notePlaceholder" placeholder="说明（可选，比如作品名、作者、类型等）"></textarea>
                 <button type="submit" class="btn-primary" data-i18n="wish.submit">提交</button>
             </form>
+        </div>
+    </div>
+
+    <!-- 公开游戏愿望单 -->
+    <div id="wishlistPublicModal" class="modal">
+        <div class="modal-content wish-manager-content">
+            <span class="close" onclick="closeWishlistPublicModal()">&times;</span>
+            <h2>🙏 <span data-i18n="wish.publicTitle">大家的愿望</span></h2>
+            <div id="wishlistPublicList" class="wish-manager-list"></div>
         </div>
     </div>
 

@@ -580,15 +580,18 @@ async function handleAPI(request, env, path, corsHeaders) {
     return jsonResponse({ success: true }, 200, corsHeaders);
   }
 
-  // 获取游戏愿望单（仅管理员）
+  // 获取游戏愿望单（仅管理员，含点赞数）
   if (path === '/api/wishes' && method === 'GET') {
     if (!await checkAuth(request, env)) {
       return jsonResponse({ error: '未授权' }, 401, corsHeaders);
     }
 
     const { results } = await env.DB.prepare(
-      `SELECT * FROM wishes
-       ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, created_date DESC`
+      `SELECT w.*,
+        (SELECT COUNT(*) FROM wish_votes v WHERE v.wish_id = w.id) as vote_count
+       FROM wishes w
+       ORDER BY CASE w.status WHEN 'pending' THEN 0 WHEN 'done' THEN 1 ELSE 2 END,
+                w.created_date DESC`
     ).all();
 
     return jsonResponse(results, 200, corsHeaders);
@@ -600,7 +603,11 @@ async function handleAPI(request, env, path, corsHeaders) {
     const title = typeof body.title === 'string' ? body.title.trim() : '';
     const link = typeof body.link === 'string' ? body.link.trim() : '';
     const note = typeof body.note === 'string' ? body.note.trim() : '';
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
 
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
     if (!title) {
       return jsonResponse({ error: '请填写游戏标题' }, 400, corsHeaders);
     }
@@ -617,14 +624,120 @@ async function handleAPI(request, env, path, corsHeaders) {
       return jsonResponse({ error: '说明不能超过2000字' }, 400, corsHeaders);
     }
 
+    // 防刷：同一设备最多 3 条未处理愿望
+    const pending = await env.DB.prepare(
+      "SELECT COUNT(*) as count FROM wishes WHERE device_id = ? AND status = 'pending'"
+    ).bind(deviceId).first();
+    if ((pending.count || 0) >= 3) {
+      return jsonResponse({ error: '你还有较多待处理愿望，请等管理员处理后再提交' }, 429, corsHeaders);
+    }
+
     const result = await env.DB.prepare(
-      'INSERT INTO wishes (title, link, note, status) VALUES (?, ?, ?, ?)'
-    ).bind(title, link || null, note || null, 'pending').run();
+      'INSERT INTO wishes (title, link, note, status, device_id) VALUES (?, ?, ?, ?, ?)'
+    ).bind(title, link || null, note || null, 'pending', deviceId).run();
 
     return jsonResponse({ id: result.meta.last_row_id, message: '愿望提交成功' }, 201, corsHeaders);
   }
 
-  // 切换愿望状态（仅管理员）
+  // 公开愿望单：游客可见，隐藏链接，显示点赞数和管理员备注
+  if (path === '/api/wishes/public' && method === 'GET') {
+    const url = new URL(request.url);
+    const deviceId = (url.searchParams.get('deviceId') || '').trim();
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    const { results } = await env.DB.prepare(
+      `SELECT
+         w.id,
+         w.title,
+         w.note,
+         w.status,
+         w.admin_note,
+         w.created_date,
+         (SELECT COUNT(*) FROM wish_votes v WHERE v.wish_id = w.id) as vote_count,
+         EXISTS(SELECT 1 FROM wish_votes v WHERE v.wish_id = w.id AND v.device_id = ?) as voted_by_me
+       FROM wishes w
+       WHERE w.status != 'rejected'
+       ORDER BY CASE w.status WHEN 'pending' THEN 0 ELSE 1 END,
+                vote_count DESC,
+                w.created_date DESC
+       LIMIT 50`
+    ).bind(deviceId).all();
+
+    return jsonResponse(results, 200, corsHeaders);
+  }
+
+  // 点赞/取消点赞愿望（匿名设备去重）
+  if (path.match(/^\/api\/wishes\/\d+\/vote$/) && method === 'POST') {
+    const wishId = path.split('/')[3];
+    const body = await request.json();
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+
+    if (!isValidDeviceId(deviceId)) {
+      return jsonResponse({ error: '设备标识无效' }, 400, corsHeaders);
+    }
+
+    const wish = await env.DB.prepare('SELECT * FROM wishes WHERE id = ?').bind(wishId).first();
+    if (!wish) {
+      return jsonResponse({ error: '愿望不存在' }, 404, corsHeaders);
+    }
+    if (wish.status !== 'pending') {
+      return jsonResponse({ error: '该愿望已处理，不能点赞' }, 400, corsHeaders);
+    }
+
+    const existing = await env.DB.prepare(
+      'SELECT id FROM wish_votes WHERE wish_id = ? AND device_id = ?'
+    ).bind(wishId, deviceId).first();
+
+    let action;
+    if (existing) {
+      await env.DB.prepare('DELETE FROM wish_votes WHERE wish_id = ? AND device_id = ?').bind(wishId, deviceId).run();
+      action = 'removed';
+    } else {
+      await env.DB.prepare('INSERT INTO wish_votes (wish_id, device_id) VALUES (?, ?)').bind(wishId, deviceId).run();
+      action = 'added';
+    }
+
+    const { count } = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM wish_votes WHERE wish_id = ?'
+    ).bind(wishId).first();
+
+    return jsonResponse({ action, voteCount: count || 0 }, 200, corsHeaders);
+  }
+
+  // 管理员更新备注和状态（待处理/已完成/已拒绝）
+  if (path.match(/^\/api\/wishes\/\d+$/) && method === 'PUT') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const wishId = path.split('/').pop();
+    const body = await request.json();
+    const adminNote = typeof body.adminNote === 'string' ? body.adminNote.trim().slice(0, 2000) : '';
+    const status = typeof body.status === 'string' ? body.status : '';
+
+    if (status && !['pending', 'done', 'rejected'].includes(status)) {
+      return jsonResponse({ error: '状态无效' }, 400, corsHeaders);
+    }
+
+    const updates = [];
+    const params = [];
+    updates.push('admin_note = ?');
+    params.push(adminNote || null);
+    if (status) {
+      updates.push('status = ?');
+      params.push(status);
+    }
+    params.push(wishId);
+
+    await env.DB.prepare(`UPDATE wishes SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+
+    return jsonResponse({ message: '愿望更新成功' }, 200, corsHeaders);
+  }
+
+  // 切换愿望状态（仅管理员，兼容旧操作）
   if (path.match(/^\/api\/wishes\/\d+\/toggle$/) && method === 'POST') {
     if (!await checkAuth(request, env)) {
       return jsonResponse({ error: '未授权' }, 401, corsHeaders);
@@ -649,6 +762,7 @@ async function handleAPI(request, env, path, corsHeaders) {
     }
 
     const wishId = path.split('/').pop();
+    await env.DB.prepare('DELETE FROM wish_votes WHERE wish_id = ?').bind(wishId).run();
     await env.DB.prepare('DELETE FROM wishes WHERE id = ?').bind(wishId).run();
 
     return jsonResponse({ message: '删除成功' }, 200, corsHeaders);

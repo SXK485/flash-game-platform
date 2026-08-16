@@ -198,8 +198,11 @@ const favoritesFilterBtn = document.getElementById('favoritesFilterBtn');
 const recentGamesSection = document.getElementById('recentGamesSection');
 const recentGamesList = document.getElementById('recentGamesList');
 const wishlistOpenBtn = document.getElementById('wishlistOpenBtn');
+const wishlistViewBtn = document.getElementById('wishlistViewBtn');
 const wishlistModal = document.getElementById('wishlistModal');
 const wishlistForm = document.getElementById('wishlistForm');
+const wishlistPublicModal = document.getElementById('wishlistPublicModal');
+const wishlistPublicList = document.getElementById('wishlistPublicList');
 const adminBtn = document.getElementById('adminBtn');
 const loginModal = document.getElementById('loginModal');
 const uploadModal = document.getElementById('uploadModal');
@@ -423,6 +426,12 @@ function setupEventListeners() {
     if (wishlistOpenBtn) {
         wishlistOpenBtn.addEventListener('click', () => {
             wishlistModal.classList.add('active');
+        });
+    }
+    if (wishlistViewBtn) {
+        wishlistViewBtn.addEventListener('click', () => {
+            wishlistPublicModal.classList.add('active');
+            loadPublicWishes();
         });
     }
     if (wishlistForm) {
@@ -1532,6 +1541,12 @@ function closeWishlistModal() {
     }
 }
 
+function closeWishlistPublicModal() {
+    if (wishlistPublicModal) {
+        wishlistPublicModal.classList.remove('active');
+    }
+}
+
 async function submitWish(event) {
     event.preventDefault();
 
@@ -1550,7 +1565,7 @@ async function submitWish(event) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ title, link, note })
+            body: JSON.stringify({ title, link, note, deviceId: getVisitorDeviceId() })
         });
 
         if (!response.ok) {
@@ -1567,6 +1582,60 @@ async function submitWish(event) {
     }
 }
 
+async function loadPublicWishes() {
+    if (!wishlistPublicList) return;
+
+    try {
+        const response = await fetch(`/api/wishes/public?deviceId=${encodeURIComponent(getVisitorDeviceId())}`);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const wishes = await response.json();
+        wishlistPublicList.innerHTML = wishes.length === 0
+            ? `<p class="wish-manager-empty">${i18n.t('wish.empty')}</p>`
+            : wishes.map(wish => `
+                <div class="wish-manager-item ${wish.status === 'done' ? 'done' : ''}">
+                    <div class="wish-manager-title">${escapeHtml(wish.title)}</div>
+                    ${wish.note ? `<div class="wish-manager-note">${escapeHtml(wish.note)}</div>` : ''}
+                    ${wish.admin_note ? `<div class="wish-manager-admin-note">${i18n.t('wish.adminNoteLabel')}：${escapeHtml(wish.admin_note)}</div>` : ''}
+                    <div class="wish-manager-meta">
+                        ${wish.status === 'pending' ? i18n.t('wish.statusPending') : i18n.t('wish.statusDone')} · ${new Date(wish.created_date).toLocaleDateString(i18n.getLanguage())}
+                    </div>
+                    <div class="wish-manager-actions">
+                        <button type="button" class="btn-secondary wish-vote-btn ${wish.voted_by_me ? 'active' : ''}" onclick="toggleWishVote(${wish.id})">
+                            👍 ${wish.vote_count || 0}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+    } catch (error) {
+        console.error('加载公开愿望单失败:', error);
+        wishlistPublicList.innerHTML = `<p class="wish-manager-empty">${i18n.t('wish.loadFailed')}</p>`;
+    }
+}
+
+async function toggleWishVote(wishId) {
+    try {
+        const response = await fetch(`/api/wishes/${wishId}/vote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ deviceId: getVisitorDeviceId() })
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            alert(data.error || i18n.t('wish.voteFailed'));
+            return;
+        }
+
+        loadPublicWishes();
+    } catch (error) {
+        console.error('点赞失败:', error);
+        alert(i18n.t('wish.voteFailed'));
+    }
+}
+
 async function showWishManager() {
     try {
         const response = await fetch('/api/wishes', {
@@ -1577,6 +1646,12 @@ async function showWishManager() {
         if (!response.ok) throw new Error('HTTP ' + response.status);
 
         const wishes = await response.json();
+        const statusText = {
+            pending: i18n.t('wish.statusPending'),
+            done: i18n.t('wish.statusDone'),
+            rejected: i18n.t('wish.statusRejected')
+        };
+
         const modal = document.createElement('div');
         modal.className = 'modal active';
         modal.id = 'wishManagerModal';
@@ -1586,13 +1661,17 @@ async function showWishManager() {
                 <h2>🙏 ${i18n.t('wish.managerTitle')}</h2>
                 <div class="wish-manager-list">
                     ${wishes.length === 0 ? `<p class="wish-manager-empty">${i18n.t('wish.empty')}</p>` : wishes.map(wish => `
-                        <div class="wish-manager-item ${wish.status === 'done' ? 'done' : ''}">
-                            <div class="wish-manager-title">${escapeHtml(wish.title)}</div>
+                        <div class="wish-manager-item ${wish.status !== 'pending' ? 'done' : ''}">
+                            <div class="wish-manager-title">${escapeHtml(wish.title)} ${wish.vote_count ? `· 👍 ${wish.vote_count}` : ''}</div>
                             ${wish.link ? `<a class="wish-manager-link" href="${escapeHtml(wish.link)}" target="_blank" rel="noopener">${escapeHtml(wish.link)}</a>` : ''}
                             ${wish.note ? `<div class="wish-manager-note">${escapeHtml(wish.note)}</div>` : ''}
-                            <div class="wish-manager-meta">${new Date(wish.created_date).toLocaleString(i18n.getLanguage())} · ${wish.status === 'pending' ? i18n.t('wish.statusPending') : i18n.t('wish.statusDone')}</div>
+                            <div class="wish-manager-meta">${new Date(wish.created_date).toLocaleString(i18n.getLanguage())} · ${statusText[wish.status] || wish.status}</div>
+                            <textarea class="wish-manager-admin-note-input" data-admin-note-id="${wish.id}" placeholder="${i18n.t('wish.adminNotePlaceholder')}">${escapeHtml(wish.admin_note || '')}</textarea>
                             <div class="wish-manager-actions">
-                                <button type="button" class="btn-secondary" onclick="toggleWishStatus(${wish.id})">${wish.status === 'pending' ? i18n.t('wish.markDone') : i18n.t('wish.markPending')}</button>
+                                <button type="button" class="btn-secondary" onclick="saveWishAdminNote(${wish.id})">${i18n.t('wish.saveNote')}</button>
+                                ${wish.status !== 'pending' ? `<button type="button" class="btn-secondary" onclick="setWishStatus(${wish.id}, 'pending')">${i18n.t('wish.setPending')}</button>` : ''}
+                                ${wish.status !== 'done' ? `<button type="button" class="btn-secondary" onclick="setWishStatus(${wish.id}, 'done')">${i18n.t('wish.setDone')}</button>` : ''}
+                                ${wish.status !== 'rejected' ? `<button type="button" class="btn-secondary" onclick="setWishStatus(${wish.id}, 'rejected')">${i18n.t('wish.setRejected')}</button>` : ''}
                                 <button type="button" class="btn-danger" onclick="deleteWish(${wish.id})">${i18n.t('app.delete')}</button>
                             </div>
                         </div>
@@ -1612,20 +1691,45 @@ function closeWishManager() {
     if (modal) modal.remove();
 }
 
-async function toggleWishStatus(wishId) {
+async function saveWishAdminNote(wishId) {
+    const input = document.querySelector(`[data-admin-note-id="${wishId}"]`);
+    if (!input) return;
+
     try {
-        const response = await fetch(`/api/wishes/${wishId}/toggle`, {
-            method: 'POST',
+        const response = await fetch(`/api/wishes/${wishId}`, {
+            method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${adminToken}`
-            }
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ adminNote: input.value.trim() })
         });
-        if (response.ok) {
-            closeWishManager();
-            showWishManager();
-        }
+
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        alert(i18n.t('wish.saveNoteSuccess'));
     } catch (error) {
-        console.error('切换愿望状态失败:', error);
+        console.error('保存备注失败:', error);
+        alert(i18n.t('wish.saveNoteFailed'));
+    }
+}
+
+async function setWishStatus(wishId, status) {
+    try {
+        const response = await fetch(`/api/wishes/${wishId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status })
+        });
+
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        closeWishManager();
+        showWishManager();
+    } catch (error) {
+        console.error('更新愿望状态失败:', error);
+        alert(i18n.t('wish.statusUpdateFailed'));
     }
 }
 
