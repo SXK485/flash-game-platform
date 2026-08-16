@@ -723,10 +723,31 @@ class I18n {
     }
     
     detectLanguage() {
-        const browserLang = navigator.language || navigator.userLanguage;
-        if (browserLang.startsWith('zh')) {
+        // 1. 优先使用浏览器首选语言
+        const browserLang = (navigator.languages && navigator.languages[0]) || navigator.language || navigator.userLanguage || '';
+        if (browserLang.toLowerCase().startsWith('zh')) {
             return 'zh-CN';
         }
+
+        // 2. 浏览器语言不是中文时，再按时区判断：华语地区默认中文
+        try {
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+            const chineseZones = [
+                'Asia/Shanghai',
+                'Asia/Chongqing',
+                'Asia/Harbin',
+                'Asia/Urumqi',
+                'Asia/Hong_Kong',
+                'Asia/Macau',
+                'Asia/Taipei'
+            ];
+            if (chineseZones.some(zone => timeZone === zone)) {
+                return 'zh-CN';
+            }
+        } catch (error) {
+            // 忽略时区检测失败
+        }
+
         return 'en';
     }
 
