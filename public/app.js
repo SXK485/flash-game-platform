@@ -1393,9 +1393,14 @@ async function showGameOrderManager() {
         `;
         document.body.appendChild(modal);
 
-        // 输入序号后，表单立即重新排序并重编号（保存时才真正落库）
+        // 编辑序号时不做任何重排；按回车后才按输入位置重排
         modal.querySelectorAll('[data-order-id]').forEach(input => {
-            input.addEventListener('input', () => liveGameOrderReinput(input));
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyOrderFromInput(input);
+                }
+            });
         });
     } catch (error) {
         console.error('加载游戏排序失败:', error);
@@ -1408,33 +1413,42 @@ function closeGameOrderManager() {
     if (modal) modal.remove();
 }
 
-// 输入序号时，在表单内立即按期望位置重排并统一编号
-function liveGameOrderReinput(changedInput) {
+// 按回车后：以当前输入位置为基准，重新排列其他游戏并统一编号
+function applyOrderFromInput(changedInput) {
     const modal = document.getElementById('gameOrderManagerModal');
     const list = modal ? modal.querySelector('.order-manager-list') : null;
     if (!modal || !list || !changedInput) return;
 
+    const targetRow = changedInput.closest('.order-manager-item');
     const rows = Array.from(list.querySelectorAll('.order-manager-item'));
-    const items = rows.map((row, index) => {
-        const input = row.querySelector('[data-order-id]');
-        const parsed = parseInt(input.value, 10);
-        return {
-            row,
-            input,
-            desired: Number.isInteger(parsed) && parsed >= 1 ? parsed : index + 1,
-            originalIndex: index
-        };
-    });
+    const total = rows.length;
 
-    items.sort((a, b) => a.desired - b.desired || a.originalIndex - b.originalIndex);
-
-    items.forEach((item, index) => {
-        item.input.value = index + 1;
-    });
-
-    for (const item of items) {
-        list.appendChild(item.row);
+    let targetPos = parseInt(changedInput.value, 10);
+    if (!Number.isInteger(targetPos)) {
+        targetPos = rows.indexOf(targetRow) + 1;
     }
+    targetPos = Math.max(1, Math.min(total, targetPos));
+
+    // 除目标行外的其他行，保持当前相对顺序，依次填充其余位置
+    const others = rows.filter(row => row !== targetRow);
+    others.forEach((row, index) => {
+        const pos = index < targetPos - 1 ? index + 1 : index + 2;
+        row.querySelector('[data-order-id]').value = pos;
+    });
+    changedInput.value = targetPos;
+
+    // 按新序号重排 DOM，并保证目标行落在目标位置
+    const ordered = [];
+    for (let pos = 1; pos <= total; pos++) {
+        if (pos === targetPos) {
+            ordered.push(targetRow);
+        } else {
+            const next = others[ordered.filter(row => row !== targetRow).length];
+            ordered.push(next);
+        }
+    }
+
+    ordered.forEach(row => list.appendChild(row));
 
     changedInput.focus();
     changedInput.select();
@@ -1447,7 +1461,7 @@ function moveGameOrderToTop(gameId) {
 
     const targetInput = target.querySelector('[data-order-id]');
     targetInput.value = 1;
-    liveGameOrderReinput(targetInput);
+    applyOrderFromInput(targetInput);
 }
 
 async function saveGameOrder() {
