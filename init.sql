@@ -152,6 +152,20 @@ CREATE INDEX IF NOT EXISTS idx_ratings_game ON ratings(game_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_device ON ratings(device_id);
 
 -- ============================================
+-- 4.8 游戏愿望单（游客提交，管理员处理）
+-- ============================================
+CREATE TABLE IF NOT EXISTS wishes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    link TEXT,
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_wishes_status ON wishes(status, created_date DESC);
+
+-- ============================================
 -- 5. 监控系统
 -- ============================================
 CREATE TABLE IF NOT EXISTS access_logs (

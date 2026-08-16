@@ -111,6 +111,10 @@
             </div>
             <div id="recentGamesList" class="recent-games-list"></div>
         </div>
+        <div id="wishlistBanner" class="wishlist-banner">
+            <span data-i18n="wish.banner">没有找到想玩的游戏？</span>
+            <button type="button" id="wishlistOpenBtn" class="wishlist-open-btn" data-i18n="wish.button">提交愿望</button>
+        </div>
         <div id="gameGrid" class="game-grid"></div>
         <div id="emptyState" class="empty-state" style="display: none;">
             <p data-i18n="games.emptyState">暂无游戏，管理员可以上传游戏</p>
@@ -287,6 +291,20 @@
                 <div id="editSaveFileInfo" class="file-list"></div>
                 <input type="text" id="editSaveName" data-i18n-placeholder="upload.saveName.placeholder" placeholder="存档名称（可选，如：mu09、data01 等，留空则不使用存档）">
                 <button type="submit" class="btn-primary" data-i18n="edit.saveChanges">保存修改</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 游戏愿望单提交 -->
+    <div id="wishlistModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeWishlistModal()">&times;</span>
+            <h2>🙏 <span data-i18n="wish.title">提交游戏愿望</span></h2>
+            <form id="wishlistForm">
+                <input type="text" id="wishTitle" maxlength="200" data-i18n-placeholder="wish.titlePlaceholder" placeholder="游戏标题（必填）" required>
+                <input type="url" id="wishLink" maxlength="2000" data-i18n-placeholder="wish.linkPlaceholder" placeholder="链接（可选，需以 http:// 或 https:// 开头）">
+                <textarea id="wishNote" maxlength="2000" data-i18n-placeholder="wish.notePlaceholder" placeholder="说明（可选，比如作品名、作者、类型等）"></textarea>
+                <button type="submit" class="btn-primary" data-i18n="wish.submit">提交</button>
             </form>
         </div>
     </div>

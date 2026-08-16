@@ -197,6 +197,9 @@ const hotTags = document.getElementById('hotTags');
 const favoritesFilterBtn = document.getElementById('favoritesFilterBtn');
 const recentGamesSection = document.getElementById('recentGamesSection');
 const recentGamesList = document.getElementById('recentGamesList');
+const wishlistOpenBtn = document.getElementById('wishlistOpenBtn');
+const wishlistModal = document.getElementById('wishlistModal');
+const wishlistForm = document.getElementById('wishlistForm');
 const adminBtn = document.getElementById('adminBtn');
 const loginModal = document.getElementById('loginModal');
 const uploadModal = document.getElementById('uploadModal');
@@ -414,6 +417,16 @@ function setupEventListeners() {
         ratingFilterSelect.addEventListener('change', () => {
             performSearch(searchInput.value);
         });
+    }
+
+    // 游戏愿望单
+    if (wishlistOpenBtn) {
+        wishlistOpenBtn.addEventListener('click', () => {
+            wishlistModal.classList.add('active');
+        });
+    }
+    if (wishlistForm) {
+        wishlistForm.addEventListener('submit', submitWish);
     }
 
     // 我的收藏筛选
@@ -809,6 +822,7 @@ function showAdminMenu() {
             <button onclick="showSiteSettings(); closeAdminMenu()">⚙️ ${i18n.t('admin.siteSettings')}</button>
             <button onclick="showTagManager(); closeAdminMenu()">🏷️ ${i18n.t('tag.manager.title')}</button>
             <button onclick="showGameOrderManager(); closeAdminMenu()">🔢 ${i18n.t('order.managerTitle')}</button>
+            <button onclick="showWishManager(); closeAdminMenu()">🙏 ${i18n.t('wish.managerTitle')}</button>
             <button onclick="logout()">🚪 ${i18n.t('nav.logout')}</button>
         </div>
     `;
@@ -1508,6 +1522,128 @@ async function saveGameOrder() {
     } catch (error) {
         console.error('保存排序失败:', error);
         alert(i18n.t('order.saveFailed'));
+    }
+}
+
+// ==================== 游戏愿望单 ====================
+function closeWishlistModal() {
+    if (wishlistModal) {
+        wishlistModal.classList.remove('active');
+    }
+}
+
+async function submitWish(event) {
+    event.preventDefault();
+
+    const title = document.getElementById('wishTitle').value.trim();
+    const link = document.getElementById('wishLink').value.trim();
+    const note = document.getElementById('wishNote').value.trim();
+
+    if (!title) {
+        alert(i18n.t('wish.titleRequired'));
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/wishes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, link, note })
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || 'HTTP ' + response.status);
+        }
+
+        alert(i18n.t('wish.submitSuccess'));
+        wishlistForm.reset();
+        closeWishlistModal();
+    } catch (error) {
+        console.error('提交愿望失败:', error);
+        alert(i18n.t('wish.submitFailed') + ': ' + error.message);
+    }
+}
+
+async function showWishManager() {
+    try {
+        const response = await fetch('/api/wishes', {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const wishes = await response.json();
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.id = 'wishManagerModal';
+        modal.innerHTML = `
+            <div class="modal-content wish-manager-content">
+                <span class="close" onclick="closeWishManager()">&times;</span>
+                <h2>🙏 ${i18n.t('wish.managerTitle')}</h2>
+                <div class="wish-manager-list">
+                    ${wishes.length === 0 ? `<p class="wish-manager-empty">${i18n.t('wish.empty')}</p>` : wishes.map(wish => `
+                        <div class="wish-manager-item ${wish.status === 'done' ? 'done' : ''}">
+                            <div class="wish-manager-title">${escapeHtml(wish.title)}</div>
+                            ${wish.link ? `<a class="wish-manager-link" href="${escapeHtml(wish.link)}" target="_blank" rel="noopener">${escapeHtml(wish.link)}</a>` : ''}
+                            ${wish.note ? `<div class="wish-manager-note">${escapeHtml(wish.note)}</div>` : ''}
+                            <div class="wish-manager-meta">${new Date(wish.created_date).toLocaleString(i18n.getLanguage())} · ${wish.status === 'pending' ? i18n.t('wish.statusPending') : i18n.t('wish.statusDone')}</div>
+                            <div class="wish-manager-actions">
+                                <button type="button" class="btn-secondary" onclick="toggleWishStatus(${wish.id})">${wish.status === 'pending' ? i18n.t('wish.markDone') : i18n.t('wish.markPending')}</button>
+                                <button type="button" class="btn-danger" onclick="deleteWish(${wish.id})">${i18n.t('app.delete')}</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('加载愿望单失败:', error);
+        alert(i18n.t('wish.loadFailed'));
+    }
+}
+
+function closeWishManager() {
+    const modal = document.getElementById('wishManagerModal');
+    if (modal) modal.remove();
+}
+
+async function toggleWishStatus(wishId) {
+    try {
+        const response = await fetch(`/api/wishes/${wishId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+        if (response.ok) {
+            closeWishManager();
+            showWishManager();
+        }
+    } catch (error) {
+        console.error('切换愿望状态失败:', error);
+    }
+}
+
+async function deleteWish(wishId) {
+    if (!confirm(i18n.t('wish.deleteConfirm'))) return;
+    try {
+        const response = await fetch(`/api/wishes/${wishId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+        if (response.ok) {
+            closeWishManager();
+            showWishManager();
+        }
+    } catch (error) {
+        console.error('删除愿望失败:', error);
     }
 }
 

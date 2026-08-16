@@ -203,6 +203,98 @@ h1 {
     text-overflow: ellipsis;
 }
 
+/* 游戏愿望单横幅 */
+.wishlist-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    font-size: 14px;
+    color: #555;
+}
+
+.wishlist-open-btn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wish-manager-content {
+    max-width: 720px !important;
+}
+
+.wish-manager-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.wish-manager-item {
+    border: 1px solid #eef0f3;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fafbfc;
+}
+
+.wish-manager-item.done {
+    opacity: 0.65;
+}
+
+.wish-manager-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.wish-manager-link {
+    display: inline-block;
+    font-size: 13px;
+    color: #667eea;
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+
+.wish-manager-note {
+    font-size: 13px;
+    color: #666;
+    white-space: pre-wrap;
+    margin-bottom: 6px;
+}
+
+.wish-manager-meta {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 8px;
+}
+
+.wish-manager-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.wish-manager-empty {
+    text-align: center;
+    color: #999;
+    padding: 20px 0;
+}
+
 .current-user-display {
     display: flex;
     align-items: center;
@@ -2002,6 +2094,11 @@ textarea {
     .recent-games-section {
         margin: 0 10px 14px;
         padding: 10px;
+    }
+
+    .wishlist-banner {
+        margin: 0 10px 14px;
+        padding: 10px 12px;
     }
 
     .recent-games-header h2 {

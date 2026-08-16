@@ -580,6 +580,80 @@ async function handleAPI(request, env, path, corsHeaders) {
     return jsonResponse({ success: true }, 200, corsHeaders);
   }
 
+  // 获取游戏愿望单（仅管理员）
+  if (path === '/api/wishes' && method === 'GET') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const { results } = await env.DB.prepare(
+      `SELECT * FROM wishes
+       ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, created_date DESC`
+    ).all();
+
+    return jsonResponse(results, 200, corsHeaders);
+  }
+
+  // 游客提交游戏愿望
+  if (path === '/api/wishes' && method === 'POST') {
+    const body = await request.json();
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    const link = typeof body.link === 'string' ? body.link.trim() : '';
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+
+    if (!title) {
+      return jsonResponse({ error: '请填写游戏标题' }, 400, corsHeaders);
+    }
+    if (title.length > 200) {
+      return jsonResponse({ error: '游戏标题不能超过200字' }, 400, corsHeaders);
+    }
+    if (link && !/^https?:\/\//i.test(link)) {
+      return jsonResponse({ error: '链接需要以 http:// 或 https:// 开头' }, 400, corsHeaders);
+    }
+    if (link.length > 2000) {
+      return jsonResponse({ error: '链接过长' }, 400, corsHeaders);
+    }
+    if (note.length > 2000) {
+      return jsonResponse({ error: '说明不能超过2000字' }, 400, corsHeaders);
+    }
+
+    const result = await env.DB.prepare(
+      'INSERT INTO wishes (title, link, note, status) VALUES (?, ?, ?, ?)'
+    ).bind(title, link || null, note || null, 'pending').run();
+
+    return jsonResponse({ id: result.meta.last_row_id, message: '愿望提交成功' }, 201, corsHeaders);
+  }
+
+  // 切换愿望状态（仅管理员）
+  if (path.match(/^\/api\/wishes\/\d+\/toggle$/) && method === 'POST') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const wishId = path.split('/')[3];
+    const wish = await env.DB.prepare('SELECT * FROM wishes WHERE id = ?').bind(wishId).first();
+    if (!wish) {
+      return jsonResponse({ error: '愿望不存在' }, 404, corsHeaders);
+    }
+
+    const nextStatus = wish.status === 'pending' ? 'done' : 'pending';
+    await env.DB.prepare('UPDATE wishes SET status = ? WHERE id = ?').bind(nextStatus, wishId).run();
+
+    return jsonResponse({ status: nextStatus }, 200, corsHeaders);
+  }
+
+  // 删除愿望（仅管理员）
+  if (path.match(/^\/api\/wishes\/\d+$/) && method === 'DELETE') {
+    if (!await checkAuth(request, env)) {
+      return jsonResponse({ error: '未授权' }, 401, corsHeaders);
+    }
+
+    const wishId = path.split('/').pop();
+    await env.DB.prepare('DELETE FROM wishes WHERE id = ?').bind(wishId).run();
+
+    return jsonResponse({ message: '删除成功' }, 200, corsHeaders);
+  }
+
   // 获取当前设备对某游戏的评分状态
   if (path === '/api/ratings' && method === 'GET') {
     const url = new URL(request.url);
