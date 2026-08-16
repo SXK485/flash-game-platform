@@ -1379,7 +1379,7 @@ async function showGameOrderManager() {
                         <div class="order-manager-item" data-game-id="${game.id}">
                             <span class="order-manager-title">${escapeHtml(game.title)}</span>
                             <input type="number" class="order-manager-input" data-order-id="${game.id}"
-                                   min="0" step="1" value="${Number(game.sort_order) || ''}"
+                                   min="1" step="1" value="${Number(game.sort_order) || index + 1}"
                                    placeholder="${index + 1}" inputmode="numeric">
                             <button type="button" class="btn-secondary order-top-btn" onclick="moveGameOrderToTop(${game.id})">${i18n.t('order.toTop')}</button>
                         </div>
@@ -1392,6 +1392,11 @@ async function showGameOrderManager() {
             </div>
         `;
         document.body.appendChild(modal);
+
+        // 输入序号后，表单立即重新排序并重编号（保存时才真正落库）
+        modal.querySelectorAll('[data-order-id]').forEach(input => {
+            input.addEventListener('input', () => liveGameOrderReinput(input));
+        });
     } catch (error) {
         console.error('加载游戏排序失败:', error);
         alert(i18n.t('order.loadFailed'));
@@ -1403,24 +1408,46 @@ function closeGameOrderManager() {
     if (modal) modal.remove();
 }
 
+// 输入序号时，在表单内立即按期望位置重排并统一编号
+function liveGameOrderReinput(changedInput) {
+    const modal = document.getElementById('gameOrderManagerModal');
+    const list = modal ? modal.querySelector('.order-manager-list') : null;
+    if (!modal || !list || !changedInput) return;
+
+    const rows = Array.from(list.querySelectorAll('.order-manager-item'));
+    const items = rows.map((row, index) => {
+        const input = row.querySelector('[data-order-id]');
+        const parsed = parseInt(input.value, 10);
+        return {
+            row,
+            input,
+            desired: Number.isInteger(parsed) && parsed >= 1 ? parsed : index + 1,
+            originalIndex: index
+        };
+    });
+
+    items.sort((a, b) => a.desired - b.desired || a.originalIndex - b.originalIndex);
+
+    items.forEach((item, index) => {
+        item.input.value = index + 1;
+    });
+
+    for (const item of items) {
+        list.appendChild(item.row);
+    }
+
+    changedInput.focus();
+    changedInput.select();
+}
+
 function moveGameOrderToTop(gameId) {
     const rows = Array.from(document.querySelectorAll('#gameOrderManagerModal .order-manager-item'));
     const target = rows.find(row => Number(row.dataset.gameId) === Number(gameId));
     if (!target) return;
 
     const targetInput = target.querySelector('[data-order-id]');
-    const oldValue = parseInt(targetInput.value, 10) || Number.MAX_SAFE_INTEGER;
-
-    for (const row of rows) {
-        if (Number(row.dataset.gameId) === Number(gameId)) continue;
-        const input = row.querySelector('[data-order-id]');
-        const value = parseInt(input.value, 10);
-        if (Number.isInteger(value) && value > 0 && value < oldValue) {
-            input.value = value + 1;
-        }
-    }
-
     targetInput.value = 1;
+    liveGameOrderReinput(targetInput);
 }
 
 async function saveGameOrder() {

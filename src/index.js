@@ -818,9 +818,9 @@ LEFT JOIN (
       }
     }
 
-    // 每批最多 200 款，用一条 CASE WHEN 批量更新，避免逐条 UPDATE 的多次网络往返
-    for (let i = 0; i < orders.length; i += 200) {
-      const chunk = orders.slice(i, i + 200);
+    // 每批最多 30 款（每条 UPDATE 参数数控制在 D1 限制内），用 CASE WHEN 批量更新
+    for (let i = 0; i < orders.length; i += 30) {
+      const chunk = orders.slice(i, i + 30);
       const caseSql = chunk.map(() => 'WHEN ? THEN ?').join(' ');
       const placeholders = chunk.map(() => '?').join(',');
       const params = [];
